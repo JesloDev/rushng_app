@@ -1,3 +1,3 @@
 rushng is the frontend
 
-rushng-api is the backend
+rushng_api is the backend
