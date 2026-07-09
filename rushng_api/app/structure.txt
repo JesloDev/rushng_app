@@ -1,0 +1,17 @@
+backend file structure
+
+rushng-api/
+├── app/
+│   ├── __init__.py
+│   ├── models.py
+│   ├── database.py
+│   ├── auth.py
+│   ├── services.py
+│   ├── bookings.py
+│   ├── merchants.py
+│   ├── payments.py
+│   ├── utils.py
+│   └── config.py
+├── requirements.txt
+├── run.py
+└── .env

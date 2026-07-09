@@ -23,6 +23,7 @@ export function MerchantSignup() {
   const { setView, user, isAuthenticated } = useAppStore();
   const [loading, setLoading] = useState(false);
   const [success, setSuccess] = useState(false);
+  const [redirectTimer, setRedirectTimer] = useState(3);
   const [touched, setTouched] = useState({
     name: false,
     category: false,
@@ -47,6 +48,24 @@ export function MerchantSignup() {
       setFormData(prev => ({ ...prev, email: user.email }));
     }
   }, [user]);
+
+  // Countdown timer for redirect after success
+  useEffect(() => {
+    let interval: NodeJS.Timeout;
+    if (success) {
+      interval = setInterval(() => {
+        setRedirectTimer((prev) => {
+          if (prev <= 1) {
+            clearInterval(interval);
+            setView('merchant-dashboard');
+            return 0;
+          }
+          return prev - 1;
+        });
+      }, 1000);
+    }
+    return () => clearInterval(interval);
+  }, [success, setView]);
 
   const validateField = (field: string, value: string): string => {
     switch (field) {
@@ -124,18 +143,16 @@ export function MerchantSignup() {
       const response = await api.registerMerchant(formData);
       if (response.success) {
         setSuccess(true);
-        toast.success('🎉 Merchant account created successfully!', {
-          description: 'Your store is now live! Start adding products.',
+        toast.success('🎉 Store created successfully!', {
+          description: 'Your store is now live! Redirecting to dashboard...',
+          duration: 5000,
         });
-        setTimeout(() => {
-          setView('merchant-dashboard');
-        }, 2500);
       } else {
         toast.error(response.message || 'Failed to create merchant account');
+        setLoading(false);
       }
     } catch (error: any) {
       toast.error(error.message || 'Failed to create merchant account');
-    } finally {
       setLoading(false);
     }
   };
@@ -148,6 +165,51 @@ export function MerchantSignup() {
     /^(\+234|0)[789][01]\d{8}$/.test(formData.phone) &&
     formData.email &&
     /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(formData.email);
+
+  if (success) {
+    return (
+      <div className="min-h-screen bg-gray-50 pt-24 pb-12 flex items-center justify-center">
+        <div className="w-full max-w-md px-4">
+          <motion.div
+            initial={{ opacity: 0, scale: 0.9 }}
+            animate={{ opacity: 1, scale: 1 }}
+            transition={{ duration: 0.4 }}
+          >
+            <Card>
+              <CardContent className="pt-8 text-center">
+                <motion.div
+                  initial={{ scale: 0 }}
+                  animate={{ scale: 1 }}
+                  transition={{ type: 'spring', stiffness: 200, delay: 0.2 }}
+                  className="mx-auto mb-4 flex h-20 w-20 items-center justify-center rounded-full bg-green-100"
+                >
+                  <CheckCircle2 className="h-10 w-10 text-green-600" />
+                </motion.div>
+                <h2 className="mb-2 text-2xl font-bold">Store Created! 🎉</h2>
+                <p className="text-muted-foreground">
+                  Your store has been successfully created.
+                </p>
+                <p className="mt-2 text-sm text-muted-foreground">
+                  You can now start adding products and managing your store.
+                </p>
+                <div className="mt-6 rounded-lg bg-orange-50 p-4 text-sm text-orange-800">
+                  <p>
+                    Redirecting to dashboard in <strong>{redirectTimer}</strong> second{redirectTimer !== 1 ? 's' : ''}...
+                  </p>
+                </div>
+                <Button 
+                  onClick={() => setView('merchant-dashboard')} 
+                  className="mt-4 w-full bg-gradient-to-r from-orange-500 to-amber-600 text-white"
+                >
+                  Go to Dashboard
+                </Button>
+              </CardContent>
+            </Card>
+          </motion.div>
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div className="min-h-screen bg-gray-50 pt-24 pb-12">
@@ -181,23 +243,6 @@ export function MerchantSignup() {
               </div>
             </CardHeader>
             <CardContent>
-              <AnimatePresence>
-                {success && (
-                  <motion.div
-                    initial={{ opacity: 0, scale: 0.9 }}
-                    animate={{ opacity: 1, scale: 1 }}
-                    exit={{ opacity: 0, scale: 0.9 }}
-                    className="mb-4 flex items-center gap-3 rounded-lg border border-green-200 bg-green-50 p-4 text-green-800"
-                  >
-                    <CheckCircle2 className="h-5 w-5 shrink-0" />
-                    <div>
-                      <p className="font-medium">Store created successfully!</p>
-                      <p className="text-sm text-green-700">Redirecting to dashboard...</p>
-                    </div>
-                  </motion.div>
-                )}
-              </AnimatePresence>
-
               {!isAuthenticated && (
                 <div className="mb-4 flex items-center gap-3 rounded-lg border border-orange-200 bg-orange-50 p-4 text-orange-800">
                   <AlertCircle className="h-5 w-5 shrink-0" />

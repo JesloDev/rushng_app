@@ -12,7 +12,7 @@ import { motion, AnimatePresence } from 'framer-motion';
 
 export function Login() {
   const { login, loginLoading, error, clearError } = useAuth();
-  const { setView } = useAppStore();
+  const { setView, isAuthenticated, getDefaultDashboard } = useAppStore();
   const [formData, setFormData] = useState({
     email: '',
     password: '',
@@ -23,9 +23,20 @@ export function Login() {
     password: false,
   });
 
+  // Clear error on unmount
   useEffect(() => {
-    clearError();
-  }, []);
+    return () => {
+      if (clearError) clearError();
+    };
+  }, [clearError]);
+
+  // Redirect if already authenticated
+  useEffect(() => {
+    if (isAuthenticated) {
+      const defaultView = getDefaultDashboard();
+      setView(defaultView);
+    }
+  }, [isAuthenticated, getDefaultDashboard, setView]);
 
   const getFieldError = (field: string) => {
     if (error?.field === field) return error.message;
@@ -42,7 +53,11 @@ export function Login() {
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setTouched({ email: true, password: true });
-    await login(formData.email, formData.password);
+    const success = await login(formData.email, formData.password);
+    if (success) {
+      const defaultView = getDefaultDashboard();
+      setView(defaultView);
+    }
   };
 
   const isFormValid = formData.email && formData.password && formData.password.length >= 8;
@@ -73,7 +88,6 @@ export function Login() {
             </CardHeader>
             <CardContent>
               <form onSubmit={handleSubmit} className="space-y-4">
-                {/* Error Alert */}
                 <AnimatePresence>
                   {error && !error.field && (
                     <motion.div
@@ -97,7 +111,7 @@ export function Login() {
                     value={formData.email}
                     onChange={(e) => {
                       setFormData({ ...formData, email: e.target.value });
-                      if (error?.field === 'email') clearError();
+                      if (error?.field === 'email' && clearError) clearError();
                     }}
                     onBlur={() => setTouched({ ...touched, email: true })}
                     className={getFieldError('email') ? 'border-red-500 focus:ring-red-500' : ''}
@@ -118,7 +132,7 @@ export function Login() {
                       value={formData.password}
                       onChange={(e) => {
                         setFormData({ ...formData, password: e.target.value });
-                        if (error?.field === 'password') clearError();
+                        if (error?.field === 'password' && clearError) clearError();
                       }}
                       onBlur={() => setTouched({ ...touched, password: true })}
                       className={getFieldError('password') ? 'border-red-500 focus:ring-red-500' : ''}
@@ -141,16 +155,6 @@ export function Login() {
                   {getFieldError('password') && (
                     <p className="mt-1 text-sm text-red-500">{getFieldError('password')}</p>
                   )}
-                </div>
-
-                <div className="flex items-center justify-between">
-                  <button
-                    type="button"
-                    onClick={() => setView('forgot-password')}
-                    className="text-sm text-orange-600 hover:underline"
-                  >
-                    Forgot password?
-                  </button>
                 </div>
 
                 <Button

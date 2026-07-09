@@ -103,12 +103,10 @@ export function Navbar() {
 
           {isAuthenticated ? (
             <DropdownMenu>
-              <DropdownMenuTrigger asChild>
-                <Button variant="ghost" size="icon" className="rounded-full">
-                  <div className="flex h-8 w-8 items-center justify-center rounded-full bg-gradient-to-br from-orange-500 to-amber-600 text-white">
-                    {user?.name?.[0]?.toUpperCase() || 'U'}
-                  </div>
-                </Button>
+              <DropdownMenuTrigger className="focus:outline-none">
+                <div className="flex h-8 w-8 cursor-pointer items-center justify-center rounded-full bg-gradient-to-br from-orange-500 to-amber-600 text-white hover:opacity-80">
+                  {user?.name?.[0]?.toUpperCase() || 'U'}
+                </div>
               </DropdownMenuTrigger>
               <DropdownMenuContent align="end" className="w-56">
                 <div className="px-2 py-1.5">

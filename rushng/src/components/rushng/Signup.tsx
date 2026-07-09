@@ -16,6 +16,7 @@ import {
 } from '@/components/ui/select';
 import { ArrowLeft, Loader2, Eye, EyeOff, AlertCircle, CheckCircle2 } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
+import { toast } from 'sonner';
 
 export function Signup() {
   const { register, registerLoading, error, clearError } = useAuth();
@@ -37,15 +38,30 @@ export function Signup() {
     password: false,
     confirmPassword: false,
   });
-  const [passwordStrength, setPasswordStrength] = useState({
-    score: 0,
-    label: '',
-    color: '',
-  });
+  const [registrationSuccess, setRegistrationSuccess] = useState(false);
+  const [redirectTimer, setRedirectTimer] = useState(3);
 
   useEffect(() => {
     clearError();
   }, []);
+
+  // Countdown timer for redirect
+  useEffect(() => {
+    let interval: NodeJS.Timeout;
+    if (registrationSuccess) {
+      interval = setInterval(() => {
+        setRedirectTimer((prev) => {
+          if (prev <= 1) {
+            clearInterval(interval);
+            setView('login');
+            return 0;
+          }
+          return prev - 1;
+        });
+      }, 1000);
+    }
+    return () => clearInterval(interval);
+  }, [registrationSuccess, setView]);
 
   const getFieldError = (field: string) => {
     if (error?.field === field) return error.message;
@@ -70,37 +86,6 @@ export function Signup() {
     return null;
   };
 
-  const checkPasswordStrength = (password: string) => {
-    let score = 0;
-    if (password.length >= 8) score++;
-    if (/[a-z]/.test(password) && /[A-Z]/.test(password)) score++;
-    if (/\d/.test(password)) score++;
-    if (/[^a-zA-Z0-9]/.test(password)) score++;
-
-    const strengthMap = [
-      { label: 'Very Weak', color: 'text-red-500' },
-      { label: 'Weak', color: 'text-orange-500' },
-      { label: 'Medium', color: 'text-yellow-500' },
-      { label: 'Strong', color: 'text-green-500' },
-      { label: 'Very Strong', color: 'text-emerald-500' },
-    ];
-
-    return {
-      score,
-      label: strengthMap[score].label,
-      color: strengthMap[score].color,
-      width: (score / 4) * 100,
-    };
-  };
-
-  useEffect(() => {
-    if (formData.password) {
-      setPasswordStrength(checkPasswordStrength(formData.password));
-    } else {
-      setPasswordStrength({ score: 0, label: '', color: '', width: 0 });
-    }
-  }, [formData.password]);
-
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setTouched({
@@ -112,16 +97,25 @@ export function Signup() {
     });
 
     if (formData.password !== formData.confirmPassword) {
+      toast.error('Passwords do not match');
       return;
     }
 
-    await register({
+    const success = await register({
       name: formData.name,
       email: formData.email,
       phone: formData.phone,
       password: formData.password,
       role: formData.role,
     });
+
+    if (success) {
+      setRegistrationSuccess(true);
+      toast.success('🎉 Account created successfully!', {
+        description: 'Please check your email to verify your account.',
+        duration: 5000,
+      });
+    }
   };
 
   const isFormValid = 
@@ -133,6 +127,53 @@ export function Signup() {
     formData.password &&
     formData.password.length >= 8 &&
     formData.confirmPassword === formData.password;
+
+  if (registrationSuccess) {
+    return (
+      <div className="min-h-screen bg-gray-50 pt-24 pb-12 flex items-center justify-center">
+        <div className="w-full max-w-md px-4">
+          <motion.div
+            initial={{ opacity: 0, scale: 0.9 }}
+            animate={{ opacity: 1, scale: 1 }}
+            transition={{ duration: 0.4 }}
+          >
+            <Card>
+              <CardContent className="pt-8 text-center">
+                <motion.div
+                  initial={{ scale: 0 }}
+                  animate={{ scale: 1 }}
+                  transition={{ type: 'spring', stiffness: 200, delay: 0.2 }}
+                  className="mx-auto mb-4 flex h-20 w-20 items-center justify-center rounded-full bg-green-100"
+                >
+                  <CheckCircle2 className="h-10 w-10 text-green-600" />
+                </motion.div>
+                <h2 className="mb-2 text-2xl font-bold">Registration Successful! 🎉</h2>
+                <p className="text-muted-foreground">
+                  Your account has been created successfully.
+                </p>
+                <p className="mt-2 text-sm text-muted-foreground">
+                  {formData.role === 'merchant' 
+                    ? 'You can now login and create your merchant store.'
+                    : 'You can now login to start using RUSHNG.'}
+                </p>
+                <div className="mt-6 rounded-lg bg-orange-50 p-4 text-sm text-orange-800">
+                  <p>
+                    Redirecting to login page in <strong>{redirectTimer}</strong> second{redirectTimer !== 1 ? 's' : ''}...
+                  </p>
+                </div>
+                <Button 
+                  onClick={() => setView('login')} 
+                  className="mt-4 w-full bg-gradient-to-r from-orange-500 to-amber-600 text-white"
+                >
+                  Login Now
+                </Button>
+              </CardContent>
+            </Card>
+          </motion.div>
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div className="min-h-screen bg-gray-50 pt-24 pb-12 flex items-center justify-center">
@@ -280,29 +321,6 @@ export function Signup() {
                       )}
                     </Button>
                   </div>
-                  
-                  {/* Password Strength Indicator */}
-                  {formData.password && (
-                    <div className="mt-2 space-y-1">
-                      <div className="h-1.5 w-full rounded-full bg-gray-200 overflow-hidden">
-                        <motion.div
-                          initial={{ width: 0 }}
-                          animate={{ width: `${passwordStrength.width}%` }}
-                          transition={{ duration: 0.3 }}
-                          className={`h-full rounded-full ${
-                            passwordStrength.score <= 1 ? 'bg-red-500' :
-                            passwordStrength.score === 2 ? 'bg-yellow-500' :
-                            passwordStrength.score === 3 ? 'bg-green-500' :
-                            'bg-emerald-500'
-                          }`}
-                        />
-                      </div>
-                      <p className={`text-xs ${passwordStrength.color}`}>
-                        {passwordStrength.label}
-                      </p>
-                    </div>
-                  )}
-                  
                   {getFieldError('password') && (
                     <p className="mt-1 text-sm text-red-500">{getFieldError('password')}</p>
                   )}
@@ -340,12 +358,6 @@ export function Signup() {
                   </div>
                   {getFieldError('confirmPassword') && (
                     <p className="mt-1 text-sm text-red-500">{getFieldError('confirmPassword')}</p>
-                  )}
-                  {formData.confirmPassword && formData.confirmPassword === formData.password && (
-                    <p className="mt-1 text-sm text-green-600 flex items-center gap-1">
-                      <CheckCircle2 className="h-3.5 w-3.5" />
-                      Passwords match
-                    </p>
                   )}
                 </div>
 

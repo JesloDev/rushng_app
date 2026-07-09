@@ -40,12 +40,15 @@ export function useAuth() {
     initAuth();
   }, []);
 
+  const clearError = () => {
+    setError(null);
+  };
+
   const login = async (email: string, password: string) => {
     setLoginLoading(true);
     setError(null);
     
     try {
-      // Validate input
       if (!email) {
         setError({ field: 'email', message: 'Email is required' });
         toast.error('Please enter your email');
@@ -70,9 +73,7 @@ export function useAuth() {
       if (response.success) {
         setUser(response.data.user);
         setAuth(true);
-        toast.success('Welcome back! 🎉', {
-          description: `Logged in as ${response.data.user.name}`,
-        });
+        toast.success(`Welcome back, ${response.data.user.name}! 🎉`);
         setLoginLoading(false);
         return true;
       } else {
@@ -106,7 +107,6 @@ export function useAuth() {
     setError(null);
 
     try {
-      // Validate input
       if (!userData.name) {
         setError({ field: 'name', message: 'Full name is required' });
         toast.error('Please enter your full name');
@@ -141,11 +141,7 @@ export function useAuth() {
       const response = await api.register(userData);
       
       if (response.success) {
-        setUser(response.data.user);
-        setAuth(true);
-        toast.success('Account created successfully! 🎉', {
-          description: `Welcome to RUSHNG, ${response.data.user.name}!`,
-        });
+        // Don't auto-login - just return success
         setRegisterLoading(false);
         return true;
       } else {
@@ -179,8 +175,6 @@ export function useAuth() {
     setAuth(false);
     toast.success('Logged out successfully');
   };
-
-  const clearError = () => setError(null);
 
   return {
     user,

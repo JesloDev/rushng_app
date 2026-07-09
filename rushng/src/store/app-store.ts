@@ -2,7 +2,22 @@ import { create } from 'zustand';
 import { persist } from 'zustand/middleware';
 import { api, User } from '@/lib/api';
 
-export type ViewType = 'home' | 'booking' | 'merchant-dashboard' | 'merchant-builder' | 'merchant-signup' | 'how-it-works' | 'pricing' | 'track' | 'login' | 'signup';
+export type ViewType = 
+  | 'home' 
+  | 'booking' 
+  | 'merchant-dashboard' 
+  | 'merchant-builder' 
+  | 'merchant-signup'
+  | 'how-it-works'
+  | 'pricing'
+  | 'track'
+  | 'login'
+  | 'signup'
+  | 'buyer-dashboard'
+  | 'profile'
+  | 'orders'
+  | 'settings';
+
 export type ServiceType = 'shopping' | 'errands' | 'condiments' | 'dispatch' | 'price_per_time' | 'laundry';
 
 export interface BookingItem { name: string; quantity: number; price: number; }
@@ -18,17 +33,24 @@ export interface MerchantProfile {
 
 interface AppState {
   // Navigation
-  currentView: ViewType; previousView: ViewType | null; 
-  setView: (view: ViewType) => void; goBack: () => void;
+  currentView: ViewType; 
+  previousView: ViewType | null; 
+  setView: (view: ViewType) => void; 
+  goBack: () => void;
   
   // Auth
   user: User | null;
   isAuthenticated: boolean;
-  setAuth: (isAuth: boolean) => void;  // Added this method
+  setAuth: (isAuth: boolean) => void;
   login: (email: string, password: string) => Promise<boolean>;
   register: (userData: any) => Promise<boolean>;
   logout: () => void;
   setUser: (user: User | null) => void;
+  
+  // Role-based routing
+  redirectAfterLogin: ViewType | null;
+  setRedirectAfterLogin: (view: ViewType | null) => void;
+  getDefaultDashboard: () => ViewType;
   
   // Booking
   bookingForm: BookingForm; selectedService: ServiceType | null; 
@@ -71,14 +93,41 @@ export const useAppStore = create<AppState>()(
       // Auth
       user: null,
       isAuthenticated: false,
-      setUser: (user) => set({ user, isAuthenticated: !!user }),
       setAuth: (isAuthenticated) => set({ isAuthenticated }),
+      setUser: (user) => set({ user, isAuthenticated: !!user }),
+      
+      redirectAfterLogin: null,
+      setRedirectAfterLogin: (view) => set({ redirectAfterLogin: view }),
+      
+      getDefaultDashboard: () => {
+        const user = get().user;
+        if (!user) return 'home';
+        
+        switch (user.role) {
+          case 'merchant':
+            return 'merchant-dashboard';
+          case 'admin':
+            return 'admin-dashboard';
+          case 'buyer':
+            return 'home'; // Buyers go to home page
+          case 'rider':
+            return 'home'; // Riders have their own app
+          default:
+            return 'home';
+        }
+      },
       
       login: async (email: string, password: string) => {
         try {
           const response = await api.login(email, password);
           if (response.success) {
-            set({ user: response.data.user, isAuthenticated: true });
+            const user = response.data.user;
+            set({ user, isAuthenticated: true });
+            
+            // Redirect to appropriate dashboard
+            const redirectView = get().getDefaultDashboard();
+            set({ currentView: redirectView });
+            
             return true;
           }
           return false;
@@ -92,7 +141,8 @@ export const useAppStore = create<AppState>()(
         try {
           const response = await api.register(userData);
           if (response.success) {
-            set({ user: response.data.user, isAuthenticated: true });
+            const user = response.data.user;
+            set({ user, isAuthenticated: true });
             return true;
           }
           return false;
