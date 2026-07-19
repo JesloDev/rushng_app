@@ -1,0 +1,107 @@
+# ================================================================
+# RUSHNG - Docker Compose
+# ================================================================
+
+version: '3.8'
+
+services:
+  # ==============================================================
+  # PostgreSQL Database
+  # ==============================================================
+  db:
+    image: postgres:16
+    container_name: rushng-db
+    environment:
+      POSTGRES_DB: rushng_prod
+      POSTGRES_USER: rushng
+      POSTGRES_PASSWORD: ${DB_PASSWORD:-rushng123}
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+      - ./scripts/init-db.sql:/docker-entrypoint-initdb.d/init.sql
+    ports:
+      - "5432:5432"
+    networks:
+      - rushng-network
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U rushng"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  # ==============================================================
+  # Redis Cache
+  # ==============================================================
+  redis:
+    image: redis:7-alpine
+    container_name: rushng-redis
+    ports:
+      - "6379:6379"
+    volumes:
+      - redis_data:/data
+    networks:
+      - rushng-network
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  # ==============================================================
+  # Flask API Backend
+  # ==============================================================
+  api:
+    build: .
+    container_name: rushng-api
+    environment:
+      ENVIRONMENT: ${ENVIRONMENT:-production}
+      SECRET_KEY: ${SECRET_KEY}
+      DATABASE_URL: postgresql://rushng:${DB_PASSWORD:-rushng123}@db:5432/rushng_prod
+      REDIS_URL: redis://redis:6379/0
+    ports:
+      - "8000:8000"
+    volumes:
+      - ./logs:/app/logs
+      - ./static:/app/static
+    depends_on:
+      db:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    networks:
+      - rushng-network
+    restart: unless-stopped
+
+  # ==============================================================
+  # Nginx (optional)
+  # ==============================================================
+  nginx:
+    image: nginx:alpine
+    container_name: rushng-nginx
+    ports:
+      - "80:80"
+      - "443:443"
+    volumes:
+      - ./nginx.conf:/etc/nginx/nginx.conf:ro
+      - ./ssl:/etc/nginx/ssl:ro
+      - ./static:/var/www/static:ro
+    depends_on:
+      - api
+    networks:
+      - rushng-network
+    restart: unless-stopped
+
+# ================================================================
+# Volumes
+# ================================================================
+
+volumes:
+  postgres_data:
+  redis_data:
+
+# ================================================================
+# Networks
+# ================================================================
+
+networks:
+  rushng-network:
+    driver: bridge

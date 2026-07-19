@@ -1,0 +1,188 @@
+rushng-frontend/
+│
+├── 📁 app/
+│   ├── 📁 (auth)/
+│   │   ├── 📁 login/
+│   │   │   └── 📄 page.tsx
+│   │   ├── 📁 register/
+│   │   │   └── 📄 page.tsx
+│   │   ├── 📁 verify/
+│   │   │   └── 📄 page.tsx
+│   │   └── 📁 reset-password/
+│   │       └── 📄 page.tsx
+│   │
+│   ├── 📁 (dashboard)/
+│   │   ├── 📁 customer/
+│   │   │   ├── 📄 page.tsx
+│   │   │   ├── 📁 jobs/
+│   │   │   │   ├── 📄 page.tsx
+│   │   │   │   └── 📄 [id].tsx
+│   │   │   └── 📁 profile/
+│   │   │       └── 📄 page.tsx
+│   │   ├── 📁 provider/
+│   │   │   ├── 📄 page.tsx
+│   │   │   ├── 📁 jobs/
+│   │   │   │   ├── 📄 page.tsx
+│   │   │   │   └── 📄 [id].tsx
+│   │   │   ├── 📁 earnings/
+│   │   │   │   └── 📄 page.tsx
+│   │   │   └── 📁 profile/
+│   │   │       └── 📄 page.tsx
+│   │   └── 📁 admin/
+│   │       ├── 📄 page.tsx
+│   │       ├── 📁 users/
+│   │       │   └── 📄 page.tsx
+│   │       ├── 📁 jobs/
+│   │       │   └── 📄 page.tsx
+│   │       └── 📁 violations/
+│   │           └── 📄 page.tsx
+│   │
+│   ├── 📁 jobs/
+│   │   ├── 📄 page.tsx
+│   │   ├── 📁 post/
+│   │   │   └── 📄 page.tsx
+│   │   └── 📁 [id]/
+│   │       ├── 📄 page.tsx
+│   │       └── 📁 track/
+│   │           └── 📄 page.tsx
+│   │
+│   ├── 📁 providers/
+│   │   ├── 📄 page.tsx
+│   │   ├── 📁 register/
+│   │   │   └── 📄 page.tsx
+│   │   └── 📁 [id]/
+│   │       └── 📄 page.tsx
+│   │
+│   ├── 📁 payments/
+│   │   └── 📁 verify/
+│   │       └── 📄 page.tsx
+│   │
+│   ├── 📄 layout.tsx
+│   ├── 📄 page.tsx
+│   └── 📄 globals.css
+│
+├── 📁 components/
+│   ├── 📁 ui/                          # shadcn/ui components
+│   │   ├── 📄 button.tsx
+│   │   ├── 📄 card.tsx
+│   │   ├── 📄 input.tsx
+│   │   ├── 📄 label.tsx
+│   │   ├── 📄 textarea.tsx
+│   │   ├── 📄 select.tsx
+│   │   ├── 📄 dialog.tsx
+│   │   ├── 📄 sheet.tsx
+│   │   ├── 📄 tabs.tsx
+│   │   ├── 📄 badge.tsx
+│   │   ├── 📄 avatar.tsx
+│   │   ├── 📄 progress.tsx
+│   │   ├── 📄 separator.tsx
+│   │   ├── 📄 tooltip.tsx
+│   │   ├── 📄 toast.tsx
+│   │   ├── 📄 toaster.tsx
+│   │   └── 📄 skeleton.tsx
+│   │
+│   ├── 📁 layout/
+│   │   ├── 📄 Navbar.tsx
+│   │   ├── 📄 Footer.tsx
+│   │   └── 📄 Sidebar.tsx
+│   │
+│   ├── 📁 auth/
+│   │   ├── 📄 LoginForm.tsx
+│   │   ├── 📄 RegisterForm.tsx
+│   │   ├── 📄 VerifyForm.tsx
+│   │   └── 📄 ResetPasswordForm.tsx
+│   │
+│   ├── 📁 jobs/
+│   │   ├── 📄 JobCard.tsx
+│   │   ├── 📄 JobList.tsx
+│   │   ├── 📄 JobDetails.tsx
+│   │   ├── 📄 JobPostForm.tsx
+│   │   ├── 📄 JobTracking.tsx
+│   │   ├── 📄 JobBids.tsx
+│   │   ├── 📄 JobFilters.tsx
+│   │   ├── 📄 CheckIn.tsx
+│   │   └── 📄 CheckOut.tsx
+│   │
+│   ├── 📁 providers/
+│   │   ├── 📄 ProviderCard.tsx
+│   │   ├── 📄 ProviderList.tsx
+│   │   ├── 📄 ProviderProfile.tsx
+│   │   ├── 📄 ProviderRegistration.tsx
+│   │   ├── 📄 ProviderVerification.tsx
+│   │   └── 📄 ProviderSearch.tsx
+│   │
+│   ├── 📁 payments/
+│   │   ├── 📄 PaymentMethod.tsx
+│   │   ├── 📄 PaymentSummary.tsx
+│   │   └── 📄 PaymentHistory.tsx
+│   │
+│   ├── 📁 violations/
+│   │   ├── 📄 ReportViolation.tsx
+│   │   └── 📄 ViolationCard.tsx
+│   │
+│   ├── 📁 dashboard/
+│   │   ├── 📄 CustomerDashboard.tsx
+│   │   ├── 📄 ProviderDashboard.tsx
+│   │   ├── 📄 AdminDashboard.tsx
+│   │   ├── 📄 StatsCard.tsx
+│   │   └── 📄 ChartWidget.tsx
+│   │
+│   ├── 📁 shared/
+│   │   ├── 📄 LocationPicker.tsx
+│   │   ├── 📄 ImageUploader.tsx
+│   │   ├── 📄 RatingStars.tsx
+│   │   ├── 📄 LoadingSpinner.tsx
+│   │   ├── 📄 ErrorBoundary.tsx
+│   │   └── 📄 EmptyState.tsx
+│   │
+│   └── 📁 home/
+│       ├── 📄 Hero.tsx
+│       ├── 📄 Services.tsx
+│       ├── 📄 HowItWorks.tsx
+│       └── 📄 Testimonials.tsx
+│
+├── 📁 lib/
+│   ├── 📄 api.ts                      # API client
+│   ├── 📄 utils.ts                    # Utilities
+│   ├── 📄 constants.ts                # Constants
+│   └── 📄 validators.ts               # Validation functions
+│
+├── 📁 hooks/
+│   ├── 📄 useAuth.ts
+│   ├── 📄 useJobs.ts
+│   ├── 📄 useProviders.ts
+│   ├── 📄 usePayments.ts
+│   ├── 📄 useLocation.ts
+│   ├── 📄 useCamera.ts
+│   ├── 📄 useNotifications.ts
+│   └── 📄 useViolations.ts
+│
+├── 📁 store/
+│   └── 📄 app-store.ts               # Zustand store
+│
+├── 📁 types/
+│   └── 📄 index.ts                   # TypeScript types
+│
+├── 📁 public/
+│   ├── 📁 images/
+│   │   ├── 📄 logo.png
+│   │   ├── 📄 favicon.ico
+│   │   └── 📄 hero-bg.jpg
+│   └── 📄 robots.txt
+│
+├── 📁 styles/
+│   └── 📄 globals.css
+│
+├── 📄 .env.local
+├── 📄 .env.local.example
+├── 📄 .gitignore
+├── 📄 package.json
+├── 📄 package-lock.json
+├── 📄 tsconfig.json
+├── 📄 next.config.js
+├── 📄 tailwind.config.js
+├── 📄 postcss.config.js
+├── 📄 components.json                # shadcn/ui config
+├── 📄 middleware.ts                  # Next.js middleware (auth)	[removed]
+├── 📄 next-env.d.ts												...
+└── 📄 README.md													...

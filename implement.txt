@@ -1,0 +1,196 @@
+┌─────────────────────────────────────────────────────────────────────────────┐
+│                    BACKEND-FIRST STRATEGY                                   │
+├─────────────────────────────────────────────────────────────────────────────┤
+│                                                                             │
+│  ✅ Build Backend API (Flask + PostgreSQL)                                 │
+│     - All models, routes, business logic                                   │
+│     - Authentication, payments, verification                               │
+│     - Job lifecycle, check-in/out system                                   │
+│     - Violation tracking, accountability                                   │
+│                                                                             │
+│  ✅ Test Backend with Postman/Insomnia                                     │
+│     - All endpoints working                                                │
+│     - Business logic correct                                               │
+│     - Security in place                                                    │
+│                                                                             │
+│  ✅ Deploy Backend (Staging)                                               │
+│     - PostgreSQL on production server                                      │
+│     - API accessible via URL                                               │
+│                                                                             │
+│  THEN → Build Frontend                                                     │
+│     - Connect to live backend API                                          │
+│     - Build UI around real data                                            │
+│     - No mock data needed                                                  │
+│                                                                             │
+└─────────────────────────────────────────────────────────────────────────────┘
+
+
+The backend needs a COMPLETE rewrite because:
+
+❌ Current backend is for a delivery app
+   - Only handles 6 service types
+   - Simple booking flow
+   - No provider/artisan system
+   - No check-in/out
+   - No violation system
+   - No escrow payments
+
+✅ New backend will be for a SERVICE MARKETPLACE
+   - Dynamic service categories (plumbing, electrical, carpentry, etc.)
+   - Provider/artisan registration and verification
+   - Job posting and bidding system
+   - Check-in/out with GPS + Photos + OTP
+   - Violation and accountability system
+   - Escrow payments with OPay/Paystack/Flutterwave
+   - Provider and customer ratings
+   - Account deletion with clean record check
+
+
+The frontend structure is good but needs updates:
+
+✅ Keep existing:
+   - UI components (shadcn/ui)
+   - Zustand state management
+   - Routing structure
+   - Design system (gradient-rush, etc.)
+
+❌ Need to update:
+   - Services page → Categories page
+   - Booking flow → Job posting flow
+   - Merchant dashboard → Provider dashboard
+   - Track order → Job tracking with check-in/out
+   - Pricing → Service categories with dynamic pricing
+   - Merchant builder → Provider profile builder
+
+🆕 New pages needed:
+   - Provider registration/verification
+   - Job discovery feed
+   - Job application/bidding
+   - Check-in/out interface with camera + GPS
+   - Violation reporting
+   - Dispute resolution
+   - Rating system (both sides)
+   - Account deletion request
+
+
+Build the database schema → Everything else follows
+Test the core functionality before building UI
+No mock data → No rework when backend is ready
+Once backend is stable, frontend can be built alongside
+
+
+frontend/
+├── app/
+│   ├── page.tsx                    # Home (service categories)
+│   ├── jobs/
+│   │   ├── page.tsx                # Job discovery feed
+│   │   ├── post/page.tsx           # Post a job
+│   │   ├── [id]/page.tsx           # Job details
+│   │   ├── [id]/track/page.tsx     # Job tracking with check-in/out
+│   │   └── my/page.tsx             # My jobs (customer)
+│   ├── providers/
+│   │   ├── page.tsx                # Provider search
+│   │   ├── register/page.tsx       # Provider registration
+│   │   ├── [id]/page.tsx           # Provider profile
+│   │   └── dashboard/page.tsx      # Provider dashboard
+│   ├── payments/
+│   │   ├── page.tsx                # Payment methods
+│   │   └── history/page.tsx        # Payment history
+│   ├── violations/
+│   │   ├── report/page.tsx         # Report violation
+│   │   └── my/page.tsx             # My violations
+│   ├── profile/
+│   │   ├── page.tsx                # User profile
+│   │   └── delete/page.tsx         # Account deletion
+│   └── auth/
+│       ├── login/page.tsx          # Login
+│       └── register/page.tsx       # Registration
+│
+├── components/
+│   ├── jobs/
+│   │   ├── JobCard.tsx             # Job preview card
+│   │   ├── JobPostForm.tsx         # Post a job form
+│   │   ├── JobDetails.tsx          # Full job details
+│   │   ├── JobTracking.tsx         # Check-in/out interface
+│   │   ├── JobBids.tsx             # Provider bids
+│   │   └── JobFilters.tsx          # Search/filter jobs
+│   ├── providers/
+│   │   ├── ProviderCard.tsx        # Provider preview
+│   │   ├── ProviderProfile.tsx     # Full provider profile
+│   │   ├── ProviderRegistration.tsx # Register as provider
+│   │   ├── ProviderDashboard.tsx   # Provider dashboard
+│   │   └── ProviderSearch.tsx      # Search providers
+│   ├── payments/
+│   │   ├── PaymentMethod.tsx       # Select payment method
+│   │   ├── PaymentEscrow.tsx       # Escrow status
+│   │   └── PaymentHistory.tsx      # Payment history
+│   ├── violations/
+│   │   ├── ReportViolation.tsx     # Report violation
+│   │   ├── ViolationDetails.tsx    # Violation details
+│   │   └── ViolationHistory.tsx    # Past violations
+│   ├── shared/
+│   │   ├── LocationPicker.tsx      # Map location selection
+│   │   ├── PhotoUploader.tsx       # Camera/photo upload
+│   │   ├── OTPScreen.tsx           # OTP verification
+│   │   └── GPSVerification.tsx     # GPS check
+│   └── ui/                         # shadcn components (keep)
+│
+├── lib/
+│   ├── api.ts                      # Updated API client
+│   ├── types.ts                    # Updated types (Job, Provider, etc.)
+│   └── constants.ts                # Categories, roles, etc.
+│
+├── hooks/
+│   ├── useAuth.ts                  # Auth (updated)
+│   ├── useJobs.ts                  # Job operations
+│   ├── useProviders.ts             # Provider operations
+│   ├── usePayments.ts              # Payment operations
+│   ├── useLocation.ts              # GPS location
+│   ├── useCamera.ts                # Camera/photo
+│   └── useViolations.ts            # Violation operations
+│
+└── store/
+    └── app-store.ts                # Updated store
+
+
+✅ Create new database schema (PostgreSQL)
+✅ Build Flask REST API
+✅ Implement authentication (JWT)
+✅ Implement job posting and lifecycle
+✅ Implement provider registration and verification
+✅ Implement check-in/out system (GPS + Photos + OTP)
+✅ Implement payment escrow (OPay/Paystack/Flutterwave)
+✅ Implement violation and accountability system
+✅ Implement rating system
+✅ Implement account deletion
+✅ Document API with Swagger
+
+✅ Use Postman/Insomnia to test all endpoints
+✅ Test business logic edge cases
+✅ Test security (JWT, rate limiting, etc.)
+✅ Test payment flows (sandbox)
+✅ Test notification system (Brevo)
+✅ Ensure all endpoints return correct data
+
+✅ Use API client to connect to backend
+✅ Build UI around real API data
+✅ Implement all pages and components
+✅ Test integration thoroughly
+
+Let's begin building the new backend with:
+
+    Database Schema - PostgreSQL tables for providers, jobs, payments, violations
+
+    Authentication - JWT with refresh tokens
+
+    Provider System - Registration, verification (NIN/BVN), skills
+
+    Job System - Posting, bidding, assignment, check-in/out
+
+    Payment System - Escrow with OPay (primary), Paystack/Flutterwave (alternatives)
+
+    Violation System - Reporting, review, penalties
+
+    Account Deletion - Clean record check, anonymization
+
+    Notification System - Brevo (SMS + Email)
