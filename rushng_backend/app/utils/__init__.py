@@ -1,23 +1,153 @@
+"""
+Utility functions for RUSHNG
+"""
+
+# Import standalone functions from geo
+from app.utils.geo import (
+    calculate_distance,
+    calculate_distance_meters,
+    is_within_radius,
+    get_eta,
+    format_location,
+    reverse_geocode,
+    geocode_address,
+    validate_coordinates,
+    get_bounding_box,
+    haversine,
+    GeoUtils
+)
+
 from app.utils.validators import (
-    validate_email, validate_phone, validate_password,
-    validate_nin, validate_bvn, validate_location
+    validate_email,
+    validate_phone,
+    validate_password,
+    validate_nin,
+    validate_bvn,
+    validate_location,
+    validate_nigerian_state,
+    validate_service_area,
+    validate_amount
 )
+
 from app.utils.helpers import (
-    generate_slug, format_currency, truncate_text,
-    calculate_age, generate_tracking_code
+    generate_slug,
+    format_currency,
+    truncate_text,
+    calculate_age,
+    generate_tracking_code,
+    generate_otp,
+    generate_id,
+    parse_boolean,
+    get_client_ip,
+    sanitize_input,
+    validate_image_size,
+    get_file_extension,
+    is_allowed_image,
+    generate_random_string,
+    time_ago,
+    deep_clone,
+    debounce,
+    format_phone_number,
+    mask_email,
+    mask_phone,
+    extract_coordinates,
+    is_valid_uuid,
+    merge_dicts,
+    paginate_list,
+    format_datetime,
+    parse_datetime
 )
+
 from app.utils.constants import (
-    ROLES, JOB_CATEGORIES, JOB_STATUSES,
-    PAYMENT_STATUSES, VIOLATION_TYPES,
-    ERROR_MESSAGES, SUCCESS_MESSAGES
+    ROLES,
+    ROLE_LABELS,
+    JOB_CATEGORIES,
+    JOB_CATEGORY_LABELS,
+    JOB_STATUSES,
+    JOB_STATUS_LABELS,
+    JOB_STATUS_COLORS,
+    PAYMENT_STATUSES,
+    PAYMENT_STATUS_LABELS,
+    PAYMENT_PROVIDERS,
+    PAYMENT_PROVIDER_NAMES,
+    VIOLATION_TYPES,
+    VIOLATION_TYPE_LABELS,
+    VIOLATION_SEVERITY,
+    VIOLATION_SEVERITY_LABELS,
+    VIOLATION_SEVERITY_POINTS,
+    ERROR_MESSAGES,
+    SUCCESS_MESSAGES,
+    APP_CONFIG
 )
 
 __all__ = [
-    'validate_email', 'validate_phone', 'validate_password',
-    'validate_nin', 'validate_bvn', 'validate_location',
-    'generate_slug', 'format_currency', 'truncate_text',
-    'calculate_age', 'generate_tracking_code',
-    'ROLES', 'JOB_CATEGORIES', 'JOB_STATUSES',
-    'PAYMENT_STATUSES', 'VIOLATION_TYPES',
-    'ERROR_MESSAGES', 'SUCCESS_MESSAGES'
+    # Geo functions
+    'calculate_distance',
+    'calculate_distance_meters',
+    'is_within_radius',
+    'get_eta',
+    'format_location',
+    'reverse_geocode',
+    'geocode_address',
+    'validate_coordinates',
+    'get_bounding_box',
+    'haversine',
+    'GeoUtils',
+    # Validators
+    'validate_email',
+    'validate_phone',
+    'validate_password',
+    'validate_nin',
+    'validate_bvn',
+    'validate_location',
+    'validate_nigerian_state',
+    'validate_service_area',
+    'validate_amount',
+    # Helpers
+    'generate_slug',
+    'format_currency',
+    'truncate_text',
+    'calculate_age',
+    'generate_tracking_code',
+    'generate_otp',
+    'generate_id',
+    'parse_boolean',
+    'get_client_ip',
+    'sanitize_input',
+    'validate_image_size',
+    'get_file_extension',
+    'is_allowed_image',
+    'generate_random_string',
+    'time_ago',
+    'deep_clone',
+    'debounce',
+    'format_phone_number',
+    'mask_email',
+    'mask_phone',
+    'extract_coordinates',
+    'is_valid_uuid',
+    'merge_dicts',
+    'paginate_list',
+    'format_datetime',
+    'parse_datetime',
+    # Constants
+    'ROLES',
+    'ROLE_LABELS',
+    'JOB_CATEGORIES',
+    'JOB_CATEGORY_LABELS',
+    'JOB_STATUSES',
+    'JOB_STATUS_LABELS',
+    'JOB_STATUS_COLORS',
+    'PAYMENT_STATUSES',
+    'PAYMENT_STATUS_LABELS',
+    'PAYMENT_PROVIDERS',
+    'PAYMENT_PROVIDER_NAMES',
+    'VIOLATION_TYPES',
+    'VIOLATION_TYPE_LABELS',
+    'VIOLATION_SEVERITY',
+    'VIOLATION_SEVERITY_LABELS',
+    'VIOLATION_SEVERITY_POINTS',
+    'ERROR_MESSAGES',
+    'SUCCESS_MESSAGES',
+    'APP_CONFIG'
 ]

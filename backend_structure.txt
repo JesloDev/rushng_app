@@ -128,6 +128,9 @@ rushng-backend/
 │   │   ├── 📄 job.py
 │   │   ├── 📄 payment.py
 │   │   ├── 📄 violation.py
+│   │   ├── 📄 advertising_plan.py
+│   │   ├── 📄 merchant_analytics.py
+│   │   ├── 📄 refresh_token.py
 │   │   ├── 📄 rating.py
 │   │   ├── 📄 notification.py
 │   │   └── 📄 audit_log.py
@@ -154,6 +157,7 @@ rushng-backend/
 │   │   ├── 📄 __init__.py
 │   │   ├── 📄 validators.py
 │   │   ├── 📄 helpers.py
+│   │   ├── 📄 geo.py
 │   │   └── 📄 constants.py
 │   │
 │   ├── 📄 __init__.py
@@ -170,15 +174,7 @@ rushng-backend/
 │   ├── 📄 access.log
 │   └── 📄 security.log
 │
-├── 📁 migrations/                        ⭐ EXISTS (from alembic)
-│   ├── 📄 alembic.ini                    ✅ Already here
-│   ├── 📄 env.py                         ✅ Auto-generated
-│   ├── 📄 README                         ✅ Auto-generated
-│   └── 📁 versions/
-│       ├── 📄 2024-01-01_120000_initial_migration.py
-│       └── 📄 (more migration files)
-│
-├── 📁 tests/                             ⭐ MISSING - Create this
+├── 📁 tests/ 
 │   ├── 📄 __init__.py
 │   ├── 📁 unit/
 │   │   ├── 📄 __init__.py
@@ -208,18 +204,13 @@ rushng-backend/
 │   ├── 📄 manage_db.py
 │   └── 📄 seed.py
 │
-├── 📁 docs/
-│   ├── 📄 api.md
-│   ├── 📄 deployment.md
-│   └── 📄 architecture.md
-│
 ├── 📁 static/                             ⭐ MISSING - For static files
 │   └── 📄 .gitkeep
 │
 ├── 📁 uploads/                            ⭐ MISSING - For user uploads
 │   └── 📄 .gitkeep
 │
-├── 📁 .github/                            ⭐ MISSING - CI/CD
+├── 📁 .github/ 
 │   └── 📁 workflows/
 │       ├── 📄 ci.yml
 │       └── 📄 deploy.yml
@@ -227,9 +218,6 @@ rushng-backend/
 ├── 📄 .env
 ├── 📄 .env.example
 ├── 📄 .gitignore
-├── 📄 .flake8
-├── 📄 .pylintrc
-├── 📄 alembic.ini                         ⭐ Can be in root OR migrations folder
 ├── 📄 Dockerfile
 ├── 📄 docker-compose.yml
 ├── 📄 gunicorn.conf.py
@@ -239,7 +227,6 @@ rushng-backend/
 ├── 📄 requirements-dev.txt
 ├── 📄 run.py
 ├── 📄 supervisor.conf
-├── 📄 wsgi.py
-├── 📄 pytest.ini                          ⭐ MISSING - Test configuration
-├── 📄 tox.ini                             ⭐ MISSING - Multi-environment testing
-└── 📄 README.md                           ⭐ MISSING - Project documentation
+├── 📄 pytest.ini 
+├── 📄 tox.ini 
+└── 📄 README.md 

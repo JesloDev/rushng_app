@@ -13,8 +13,11 @@ class Provider(db.Model):
     id = Column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
     user_id = Column(UUID(as_uuid=True), ForeignKey('users.id', ondelete='CASCADE'), nullable=False)
     
+    # Store Information
+    slug = Column(String(255), unique=True)
+    
     # Skills & Experience
-    skills = Column(ARRAY(String), default=[])  # e.g., ['plumbing', 'electrical']
+    skills = Column(ARRAY(String), default=[])
     years_experience = Column(Integer, default=0)
     certifications = Column(JSONB, default=[])
     
@@ -29,24 +32,33 @@ class Provider(db.Model):
     availability = Column(JSONB, default={'days': [], 'hours': []})
     
     # Verification
-    verification_level = Column(String(50), default='basic')  # basic, verified, certified
+    verification_level = Column(String(50), default='basic')
     verification_documents = Column(JSONB, default=[])
     
     # Portfolio
     portfolio_urls = Column(ARRAY(String), default=[])
     
+    # Store Branding
+    store_theme = Column(String(50), default='orange')
+    store_cover_color = Column(String(50), default='#f97316')
+    store_views = Column(Integer, default=0)
+    
     # Status
     is_available = Column(Boolean, default=True)
-    is_on_duty = Column(Boolean, default=False)  # Currently working on a job
+    is_on_duty = Column(Boolean, default=False)
     
     # Ratings & Stats
     rating = Column(Float, default=0.0)
     total_jobs_completed = Column(Integer, default=0)
     total_jobs_cancelled = Column(Integer, default=0)
     total_earnings = Column(Float, default=0.0)
+    total_revenue = Column(Float, default=0.0)
     
     # Compliance
-    compliance_score = Column(Integer, default=100)  # 0-100
+    compliance_score = Column(Integer, default=100)
+    
+    # Plan
+    plan = Column(String(50), default='free')
     
     # Timestamps
     created_at = Column(DateTime, default=datetime.utcnow)
@@ -54,6 +66,9 @@ class Provider(db.Model):
     
     # Relationships
     user = db.relationship('User', back_populates='provider')
+    
+    # Analytics relationship - defined here
+    analytics = db.relationship('MerchantAnalytics', back_populates='provider', cascade='all, delete-orphan', lazy='dynamic')
     
     def __repr__(self):
         return f'<Provider {self.user.full_name if self.user else "Unknown"}>'
@@ -82,10 +97,8 @@ class Provider(db.Model):
     
     def update_compliance_score(self):
         from app.models.violation import Violation
-        # Start with 100 points
         score = 100
         
-        # Deduct points based on violations
         violations = Violation.query.filter_by(user_id=self.user_id, status='confirmed').all()
         for violation in violations:
             if violation.severity == 'minor':
@@ -95,13 +108,13 @@ class Provider(db.Model):
             elif violation.severity == 'critical':
                 score -= 30
         
-        # Ensure score doesn't go below 0
         self.compliance_score = max(0, score)
     
     def to_dict(self):
         return {
             'id': str(self.id),
             'user_id': str(self.user_id),
+            'slug': self.slug,
             'skills': self.skills,
             'years_experience': self.years_experience,
             'hourly_rate': self.hourly_rate,
@@ -113,5 +126,9 @@ class Provider(db.Model):
             'total_jobs_cancelled': self.total_jobs_cancelled,
             'compliance_score': self.compliance_score,
             'portfolio_urls': self.portfolio_urls,
+            'store_theme': self.store_theme,
+            'store_cover_color': self.store_cover_color,
+            'store_views': self.store_views,
+            'plan': self.plan,
             'created_at': self.created_at.isoformat() if self.created_at else None,
         }

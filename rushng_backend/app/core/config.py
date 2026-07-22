@@ -6,33 +6,31 @@ load_dotenv()
 
 class Config:
     # Flask
-    SECRET_KEY = os.getenv('SECRET_KEY')
-    ENVIRONMENT = os.getenv('ENVIRONMENT', 'production')
-    DEBUG = os.getenv('DEBUG', 'False').lower() == 'true'
+    SECRET_KEY = os.getenv('SECRET_KEY', 'dev-secret-key')
+    ENVIRONMENT = os.getenv('ENVIRONMENT', 'development')
+    DEBUG = os.getenv('DEBUG', 'True').lower() == 'true'
     
     # Database
-    SQLALCHEMY_DATABASE_URI = os.getenv('DATABASE_URL')
+    SQLALCHEMY_DATABASE_URI = os.getenv('DATABASE_URL', 'postgresql://rushng:rushng@localhost:5432/rushng_dev')
     SQLALCHEMY_TRACK_MODIFICATIONS = False
     SQLALCHEMY_POOL_SIZE = 50
     SQLALCHEMY_MAX_OVERFLOW = 100
     SQLALCHEMY_POOL_TIMEOUT = 30
     
     # JWT
-    JWT_SECRET_KEY = os.getenv('JWT_SECRET_KEY')
-    JWT_ACCESS_TOKEN_EXPIRES = timedelta(
-        seconds=int(os.getenv('JWT_ACCESS_TOKEN_EXPIRES', 3600))
-    )
-    JWT_REFRESH_TOKEN_EXPIRES = timedelta(
-        seconds=int(os.getenv('JWT_REFRESH_TOKEN_EXPIRES', 2592000))
-    )
+    JWT_SECRET_KEY = os.getenv('JWT_SECRET_KEY', 'dev-jwt-secret')
     
     # CORS
-    CORS_ORIGINS = os.getenv('CORS_ORIGINS', '').split(',')
+    CORS_ORIGINS = os.getenv('CORS_ORIGINS', 'http://localhost:3000,http://127.0.0.1:3000').split(',')
     
     # Rate Limiting
-    RATELIMIT_DEFAULT = os.getenv('RATELIMIT_DEFAULT', '100 per minute')
-    RATELIMIT_AUTH = os.getenv('RATELIMIT_AUTH', '5 per minute')
-    RATELIMIT_JOB_POST = os.getenv('RATELIMIT_JOB_POST', '20 per hour')
+    RATELIMIT_DEFAULT = os.getenv('RATELIMIT_DEFAULT', '1000 per minute')
+    RATELIMIT_AUTH = os.getenv('RATELIMIT_AUTH', '100 per minute')
+    RATELIMIT_JOB_POST = os.getenv('RATELIMIT_JOB_POST', '100 per hour')
+    RATELIMIT_STORAGE_URL = os.getenv('REDIS_URL', 'memory://')
+    
+    # Sentry (Optional - set in .env if needed)
+    SENTRY_DSN = os.getenv('SENTRY_DSN', '')
     
     # Payments
     OPAY_API_KEY = os.getenv('OPAY_API_KEY')
@@ -54,11 +52,8 @@ class Config:
     # Redis
     REDIS_URL = os.getenv('REDIS_URL', 'redis://localhost:6379/0')
     
-    # Sentry
-    SENTRY_DSN = os.getenv('SENTRY_DSN')
-    
     # Security
-    TALISMAN_ENABLED = os.getenv('TALISMAN_ENABLED', 'True').lower() == 'true'
+    TALISMAN_ENABLED = os.getenv('TALISMAN_ENABLED', 'False').lower() == 'true'
     BCRYPT_LOG_ROUNDS = int(os.getenv('BCRYPT_LOG_ROUNDS', 12))
     
     # Account Deletion
@@ -70,25 +65,19 @@ class DevelopmentConfig(Config):
     DEBUG = True
     ENVIRONMENT = 'development'
     TALISMAN_ENABLED = False
+    RATELIMIT_STORAGE_URL = 'memory://'
+    SENTRY_DSN = ''
 
 
 class ProductionConfig(Config):
     DEBUG = False
     ENVIRONMENT = 'production'
     TALISMAN_ENABLED = True
-
-
-class TestingConfig(Config):
-    TESTING = True
-    DEBUG = True
-    ENVIRONMENT = 'testing'
-    TALISMAN_ENABLED = False
-    SQLALCHEMY_DATABASE_URI = os.getenv('TEST_DATABASE_URL', 'postgresql://rushng_user:rushng@localhost:5432/rushng_test')
+    RATELIMIT_STORAGE_URL = os.getenv('REDIS_URL', 'redis://localhost:6379/0')
 
 
 config = {
     'development': DevelopmentConfig,
     'production': ProductionConfig,
-    'testing': TestingConfig,
-    'default': ProductionConfig
+    'default': DevelopmentConfig
 }

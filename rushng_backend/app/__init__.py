@@ -1,112 +1,142 @@
+"""
+RUSHNG Backend - Flask Application Factory
+"""
+
+import os
+import logging
 from flask import Flask, jsonify, request
 from flask_cors import CORS
 from flask_jwt_extended import JWTManager
 from flask_migrate import Migrate
 from flask_limiter import Limiter
 from flask_limiter.util import get_remote_address
+from flask_bcrypt import Bcrypt
 from flask_talisman import Talisman
 from flask_compress import Compress
-from sentry_sdk.integrations.flask import FlaskIntegration
-import sentry_sdk
-import logging
-from datetime import datetime
 
 from app.core.config import config
 from app.core.database import db
 from app.core.logging import setup_logging
-from app.extensions import (
-    jwt, migrate, limiter, talisman, compress, cors, bcrypt
-)
+
+# Initialize extensions
+bcrypt = Bcrypt()
+jwt = JWTManager()
+migrate = Migrate()
+limiter = Limiter(key_func=get_remote_address)
+talisman = Talisman()
+compress = Compress()
+cors = CORS()
 
 
 def create_app(config_name=None):
-    app = Flask(__name__)
+    """Application factory"""
+    application = Flask(__name__)
     
     # Load configuration
     if config_name is None:
-        config_name = 'production'
-    app.config.from_object(config[config_name])
+        config_name = os.getenv('FLASK_ENV', 'development')
+    application.config.from_object(config[config_name])
     
     # Setup logging
-    setup_logging(app)
+    setup_logging(application)
     
     # Initialize extensions
-    db.init_app(app)
-    jwt.init_app(app)
-    migrate.init_app(app, db)
-    bcrypt.init_app(app)
-    limiter.init_app(app)
-    talisman.init_app(app)
-    compress.init_app(app)
-    cors.init_app(app, origins=app.config['CORS_ORIGINS'])
+    db.init_app(application)
+    jwt.init_app(application)
+    migrate.init_app(application, db)
+    bcrypt.init_app(application)
+    limiter.init_app(application)
+    talisman.init_app(application)
+    compress.init_app(application)
+    cors.init_app(application, origins=application.config.get('CORS_ORIGINS', ['*']))
     
-    # Sentry
-    if app.config['SENTRY_DSN']:
-        sentry_sdk.init(
-            dsn=app.config['SENTRY_DSN'],
-            integrations=[FlaskIntegration()],
-            environment=app.config['ENVIRONMENT']
-        )
+    # Register models so Alembic/Flask-Migrate detects metadata changes
+    try:
+        import app.models
+    except ImportError as e:
+        application.logger.error(f"Failed to load database models: {e}")
+        raise
+
+    # Sentry (only if configured)
+    sentry_dsn = application.config.get('SENTRY_DSN')
+    if sentry_dsn:
+        try:
+            import sentry_sdk
+            from sentry_sdk.integrations.flask import FlaskIntegration
+            sentry_sdk.init(
+                dsn=sentry_dsn,
+                integrations=[FlaskIntegration()],
+                environment=application.config.get('ENVIRONMENT', 'development')
+            )
+            application.logger.info("Sentry initialized")
+        except ImportError:
+            application.logger.warning("Sentry SDK not installed, skipping")
+        except Exception as e:
+            application.logger.warning(f"Failed to initialize Sentry: {e}")
     
     # Register blueprints
-    from app.api.auth import auth_bp
-    from app.api.users import users_bp
-    from app.api.providers import providers_bp
-    from app.api.jobs import jobs_bp
-    from app.api.payments import payments_bp
-    from app.api.violations import violations_bp
-    from app.api.ratings import ratings_bp
-    from app.api.notifications import notifications_bp
-    from app.api.admin import admin_bp
-    
-    app.register_blueprint(auth_bp, url_prefix='/api/auth')
-    app.register_blueprint(users_bp, url_prefix='/api/users')
-    app.register_blueprint(providers_bp, url_prefix='/api/providers')
-    app.register_blueprint(jobs_bp, url_prefix='/api/jobs')
-    app.register_blueprint(payments_bp, url_prefix='/api/payments')
-    app.register_blueprint(violations_bp, url_prefix='/api/violations')
-    app.register_blueprint(ratings_bp, url_prefix='/api/ratings')
-    app.register_blueprint(notifications_bp, url_prefix='/api/notifications')
-    app.register_blueprint(admin_bp, url_prefix='/api/admin')
+    try:
+        from app.api.auth import auth_bp
+        from app.api.users import users_bp
+        from app.api.providers import providers_bp
+        from app.api.jobs import jobs_bp
+        from app.api.payments import payments_bp
+        from app.api.violations import violations_bp
+        from app.api.ratings import ratings_bp
+        from app.api.notifications import notifications_bp
+        from app.api.admin import admin_bp
+        
+        application.register_blueprint(auth_bp, url_prefix='/api/auth')
+        application.register_blueprint(users_bp, url_prefix='/api/users')
+        application.register_blueprint(providers_bp, url_prefix='/api/providers')
+        application.register_blueprint(jobs_bp, url_prefix='/api/jobs')
+        application.register_blueprint(payments_bp, url_prefix='/api/payments')
+        application.register_blueprint(violations_bp, url_prefix='/api/violations')
+        application.register_blueprint(ratings_bp, url_prefix='/api/ratings')
+        application.register_blueprint(notifications_bp, url_prefix='/api/notifications')
+        application.register_blueprint(admin_bp, url_prefix='/api/admin')
+    except ImportError as e:
+        application.logger.error(f"Failed to register blueprints: {e}")
+        raise
     
     # Health check
-    @app.route('/health')
+    @application.route('/api/health')
     def health_check():
         try:
             db.session.execute('SELECT 1')
             db_status = 'healthy'
-        except:
-            db_status = 'unhealthy'
+        except Exception as e:
+            db_status = f'unhealthy: {str(e)}'
         
         return jsonify({
             'status': 'healthy' if db_status == 'healthy' else 'degraded',
             'database': db_status,
-            'environment': app.config['ENVIRONMENT'],
-            'timestamp': datetime.utcnow().isoformat()
+            'environment': application.config.get('ENVIRONMENT', 'unknown')
+        })
+    
+    # Root endpoint
+    @application.route('/')
+    def root():
+        return jsonify({
+            'name': 'RUSHNG API',
+            'version': '1.0.0',
+            'status': 'running',
+            'environment': application.config.get('ENVIRONMENT', 'unknown')
         })
     
     # Error handlers
-    @app.errorhandler(404)
+    @application.errorhandler(404)
     def not_found(error):
-        return jsonify({
-            'success': False,
-            'error': 'Resource not found'
-        }), 404
+        return jsonify({'error': 'Resource not found'}), 404
     
-    @app.errorhandler(500)
+    @application.errorhandler(500)
     def internal_error(error):
-        app.logger.error(f"Internal server error: {error}")
-        return jsonify({
-            'success': False,
-            'error': 'Internal server error'
-        }), 500
+        application.logger.error(f"Internal server error: {error}")
+        return jsonify({'error': 'Internal server error'}), 500
     
     # Request logging
-    @app.before_request
+    @application.before_request
     def log_request():
-        app.logger.info(
-            f"{request.method} {request.path} - "
-            f"IP: {request.remote_addr}"
-        )
+        application.logger.info(f"{request.method} {request.path}")
     
-    return app
+    return application

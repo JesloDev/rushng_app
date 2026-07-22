@@ -1,8 +1,8 @@
 import logging
 import sys
 from logging.handlers import RotatingFileHandler
-from pythonjsonlogger import jsonlogger
 import os
+from datetime import datetime
 
 # Create logs directory if it doesn't exist
 LOG_DIR = 'logs'
@@ -19,127 +19,73 @@ def setup_logging(app):
     log_level = logging.DEBUG if app.debug else logging.INFO
     
     # Create formatters
-    json_formatter = jsonlogger.JsonFormatter(
-        fmt='%(asctime)s %(name)s %(levelname)s %(message)s %(module)s %(funcName)s %(lineno)d',
-        datefmt='%Y-%m-%dT%H:%M:%S%z'
-    )
-    
     console_formatter = logging.Formatter(
         '%(asctime)s - %(name)s - %(levelname)s - %(message)s'
     )
     
-    # Console handler (for development)
+    # Console handler
     console_handler = logging.StreamHandler(sys.stdout)
     console_handler.setLevel(log_level)
     console_handler.setFormatter(console_formatter)
     
-    # File handler (JSON format for production)
-    file_handler = RotatingFileHandler(
-        os.path.join(LOG_DIR, 'app.log'),
-        maxBytes=10_485_760,  # 10MB
-        backupCount=10
-    )
-    file_handler.setLevel(log_level)
-    file_handler.setFormatter(json_formatter)
+    # File handler
+    try:
+        file_handler = RotatingFileHandler(
+            os.path.join(LOG_DIR, 'app.log'),
+            maxBytes=10_485_760,  # 10MB
+            backupCount=10
+        )
+        file_handler.setLevel(log_level)
+        file_handler.setFormatter(console_formatter)
+        app.logger.addHandler(file_handler)
+    except Exception as e:
+        app.logger.warning(f"Could not create file handler: {e}")
     
     # Error file handler
-    error_file_handler = RotatingFileHandler(
-        os.path.join(LOG_DIR, 'error.log'),
-        maxBytes=10_485_760,  # 10MB
-        backupCount=10
-    )
-    error_file_handler.setLevel(logging.ERROR)
-    error_file_handler.setFormatter(json_formatter)
+    try:
+        error_file_handler = RotatingFileHandler(
+            os.path.join(LOG_DIR, 'error.log'),
+            maxBytes=10_485_760,  # 10MB
+            backupCount=10
+        )
+        error_file_handler.setLevel(logging.ERROR)
+        error_file_handler.setFormatter(console_formatter)
+        app.logger.addHandler(error_file_handler)
+    except Exception as e:
+        app.logger.warning(f"Could not create error file handler: {e}")
     
-    # Access log handler
-    access_file_handler = RotatingFileHandler(
-        os.path.join(LOG_DIR, 'access.log'),
-        maxBytes=10_485_760,  # 10MB
-        backupCount=10
-    )
-    access_file_handler.setLevel(logging.INFO)
-    access_file_handler.setFormatter(json_formatter)
-    
-    # Add handlers to app logger
+    # Add console handler
     app.logger.addHandler(console_handler)
-    app.logger.addHandler(file_handler)
-    app.logger.addHandler(error_file_handler)
-    app.logger.addHandler(access_file_handler)
     app.logger.setLevel(log_level)
     
-    # Add handlers to werkzeug logger
+    # Set werkzeug logger level
     werkzeug_logger = logging.getLogger('werkzeug')
-    werkzeug_logger.addHandler(console_handler)
-    werkzeug_logger.addHandler(file_handler)
     werkzeug_logger.setLevel(log_level)
-    
-    # Add handlers to SQLAlchemy logger (if needed)
-    if app.debug:
-        sqlalchemy_logger = logging.getLogger('sqlalchemy.engine')
-        sqlalchemy_logger.addHandler(console_handler)
-        sqlalchemy_logger.setLevel(logging.INFO)
     
     app.logger.info(f"Logging configured at {log_level} level")
     app.logger.info(f"Environment: {app.config.get('ENVIRONMENT', 'unknown')}")
 
 def log_access(app, request, response):
     """Log API access"""
-    app.logger.info({
-        'type': 'access',
-        'method': request.method,
-        'path': request.path,
-        'status_code': response.status_code,
-        'ip': request.remote_addr,
-        'user_agent': request.headers.get('User-Agent'),
-        'content_length': request.content_length,
-        'referrer': request.headers.get('Referer')
-    })
+    app.logger.info(
+        f"ACCESS: {request.method} {request.path} - {response.status_code} - {request.remote_addr}"
+    )
 
 def log_error(app, error, request=None):
     """Log errors with context"""
-    error_data = {
-        'type': 'error',
-        'error': str(error),
-        'error_type': type(error).__name__,
-    }
-    
+    error_msg = f"ERROR: {error}"
     if request:
-        error_data.update({
-            'method': request.method,
-            'path': request.path,
-            'ip': request.remote_addr,
-            'user_agent': request.headers.get('User-Agent')
-        })
-    
-    app.logger.error(error_data)
+        error_msg += f" - {request.method} {request.path} - {request.remote_addr}"
+    app.logger.error(error_msg)
 
 def log_user_action(app, user_id, action, details=None):
     """Log user actions for audit"""
-    app.logger.info({
-        'type': 'user_action',
-        'user_id': user_id,
-        'action': action,
-        'details': details or {},
-        'timestamp': datetime.utcnow().isoformat()
-    })
+    app.logger.info(f"USER ACTION: {user_id} - {action} - {details or {}}")
 
 def log_security_event(app, event_type, details=None):
     """Log security events"""
-    app.logger.warning({
-        'type': 'security_event',
-        'event_type': event_type,
-        'details': details or {},
-        'timestamp': datetime.utcnow().isoformat()
-    })
+    app.logger.warning(f"SECURITY: {event_type} - {details or {}}")
 
 def log_business_event(app, event_type, data=None):
     """Log business events (payments, jobs, etc.)"""
-    app.logger.info({
-        'type': 'business_event',
-        'event_type': event_type,
-        'data': data or {},
-        'timestamp': datetime.utcnow().isoformat()
-    })
-
-# Add datetime import
-from datetime import datetime
+    app.logger.info(f"BUSINESS: {event_type} - {data or {}}")

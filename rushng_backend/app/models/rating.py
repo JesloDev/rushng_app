@@ -1,5 +1,5 @@
 from sqlalchemy.dialects.postgresql import UUID, JSONB
-from sqlalchemy import Column, Integer, Text, DateTime, ForeignKey
+from sqlalchemy import Column, Integer, String, Text, DateTime, ForeignKey
 from datetime import datetime
 import uuid
 
@@ -17,12 +17,9 @@ class Rating(db.Model):
     # Rating
     rating = Column(Integer, nullable=False)  # 1-5
     comment = Column(Text)
-    
-    # Categories
     categories = Column(JSONB, default={})
-    # Example: {"punctuality": 4, "quality": 5, "communication": 4, "professionalism": 5}
     
-    # Target type (customer or provider)
+    # Target type
     target_type = Column(String(50), nullable=False)  # 'customer' or 'provider'
     
     # Timestamps

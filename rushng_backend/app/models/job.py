@@ -60,6 +60,7 @@ class Job(db.Model):
     # Pricing
     estimated_price = Column(Float)
     final_price = Column(Float)
+    service_fee = Column(Float)
     
     # Schedule
     start_time = Column(DateTime)
@@ -75,6 +76,9 @@ class Job(db.Model):
     check_in_location = Column(Geography('POINT', srid=4326))
     check_out_location = Column(Geography('POINT', srid=4326))
     
+    # Tracking
+    tracking_code = Column(String(50), unique=True)
+    
     # Metadata
     cancelled_at = Column(DateTime)
     cancellation_reason = Column(Text)
@@ -87,8 +91,15 @@ class Job(db.Model):
     # Relationships
     customer = db.relationship('User', foreign_keys=[customer_id], back_populates='jobs_as_customer')
     provider_assigned = db.relationship('User', foreign_keys=[provider_id], back_populates='jobs_as_provider')
-    payment = db.relationship('Payment', back_populates='job', uselist=False)
-    ratings = db.relationship('Rating', back_populates='job')
+    
+    # Payment relationship - fixed
+    payments = db.relationship('Payment', back_populates='job', cascade='all, delete-orphan', lazy='dynamic')
+    
+    # Ratings relationship
+    ratings = db.relationship('Rating', back_populates='job', cascade='all, delete-orphan', lazy='dynamic')
+    
+    # Violations relationship
+    violations = db.relationship('Violation', back_populates='job', lazy='dynamic')
     
     def __repr__(self):
         return f'<Job {self.title} - {self.status}>'

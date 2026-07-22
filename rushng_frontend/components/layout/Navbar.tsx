@@ -2,7 +2,8 @@
 
 import Link from 'next/link';
 import { usePathname, useRouter } from 'next/navigation';
-import { Package, Menu, X, User, LogOut, Settings, Briefcase, ClipboardList, Home, Search, Users } from 'lucide-react';
+import Image from 'next/image';
+import { Menu, X, User, LogOut, Settings, Briefcase, ClipboardList, Home, Search, Users } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import {
   DropdownMenu,
@@ -43,17 +44,25 @@ export function Navbar() {
   };
 
   return (
-    <nav className="sticky top-0 z-50 border-b bg-white/80 backdrop-blur-md">
+    <nav className="sticky top-0 z-50 border-b bg-white/80 backdrop-blur-md shadow-sm">
       <div className="container mx-auto px-4">
         <div className="flex h-16 items-center justify-between">
           {/* Logo - Clickable to home */}
           <button
             onClick={handleLogoClick}
-            className="flex items-center gap-2 transition-opacity hover:opacity-80"
+            className="flex items-center gap-2 transition-opacity hover:opacity-80 group"
             aria-label="Go to home"
           >
-            <div className="rounded-lg bg-gradient-to-r from-orange-500 to-amber-600 p-1.5">
-              <Package className="h-5 w-5 text-white" />
+            <div className="relative h-9 w-9 rounded-lg bg-gradient-to-r from-orange-500 to-amber-600 p-1.5 shadow-md transition-transform group-hover:scale-105">
+              {/* Custom Logo Image */}
+              <Image
+                src="/rushng-logo.png"
+                alt="RUSHNG Logo"
+                width={24}
+                height={24}
+                className="h-6 w-6 object-contain brightness-0 invert"
+                priority
+              />
             </div>
             <span className="text-2xl font-bold">
               <span className="text-orange-500">RUSH</span>
@@ -83,14 +92,14 @@ export function Navbar() {
             {isAuthenticated ? (
               <div className="flex items-center gap-3">
                 <Link href="/jobs/my">
-                  <Button variant="ghost" size="sm" className="gap-1.5">
+                  <Button variant="ghost" size="sm" className="gap-1.5 hover:text-orange-500">
                     <ClipboardList className="h-4 w-4" />
                     My Jobs
                   </Button>
                 </Link>
                 {user?.role === 'provider' && (
                   <Link href="/providers/me">
-                    <Button variant="ghost" size="sm" className="gap-1.5">
+                    <Button variant="ghost" size="sm" className="gap-1.5 hover:text-orange-500">
                       <Briefcase className="h-4 w-4" />
                       Dashboard
                     </Button>
@@ -98,9 +107,9 @@ export function Navbar() {
                 )}
                 <DropdownMenu>
                   <DropdownMenuTrigger asChild>
-                    <Button variant="ghost" className="relative h-10 w-10 rounded-full">
+                    <Button variant="ghost" className="relative h-10 w-10 rounded-full hover:bg-orange-50">
                       <Avatar className="h-9 w-9">
-                        <AvatarFallback className="bg-gradient-to-br from-orange-500 to-amber-600 text-white">
+                        <AvatarFallback className="bg-gradient-to-br from-orange-500 to-amber-600 text-white text-sm font-semibold">
                           {user?.full_name?.charAt(0) || 'U'}
                         </AvatarFallback>
                       </Avatar>
@@ -134,7 +143,7 @@ export function Navbar() {
                     </DropdownMenuItem>
                     <DropdownMenuSeparator />
                     <DropdownMenuItem
-                      className="cursor-pointer text-red-600 focus:text-red-600"
+                      className="cursor-pointer text-red-600 focus:text-red-600 hover:bg-red-50"
                       onClick={handleLogout}
                     >
                       <LogOut className="mr-2 h-4 w-4" />
@@ -146,12 +155,12 @@ export function Navbar() {
             ) : (
               <div className="flex items-center gap-3">
                 <Link href="/login">
-                  <Button variant="ghost" size="sm">
+                  <Button variant="ghost" size="sm" className="hover:text-orange-500">
                     Login
                   </Button>
                 </Link>
                 <Link href="/register">
-                  <Button className="bg-gradient-to-r from-orange-500 to-amber-600 text-white hover:from-orange-600 hover:to-amber-700">
+                  <Button className="bg-gradient-to-r from-orange-500 to-amber-600 text-white hover:from-orange-600 hover:to-amber-700 shadow-md hover:shadow-lg transition-all duration-300">
                     Get Started
                   </Button>
                 </Link>
@@ -161,7 +170,7 @@ export function Navbar() {
 
           {/* Mobile Menu Button */}
           <button
-            className="md:hidden"
+            className="md:hidden rounded-md p-2 hover:bg-gray-100 transition-colors"
             onClick={() => setIsOpen(!isOpen)}
             aria-label="Toggle menu"
           >
@@ -172,14 +181,14 @@ export function Navbar() {
         {/* Mobile Navigation */}
         {isOpen && (
           <div className="md:hidden py-4 border-t">
-            <div className="flex flex-col gap-2">
+            <div className="flex flex-col gap-1">
               {navItems.map((item) => {
                 const Icon = item.icon;
                 return (
                   <Link
                     key={item.href}
                     href={item.href}
-                    className={`flex items-center gap-2 px-3 py-2 text-sm font-medium rounded-md transition-colors hover:bg-orange-50 hover:text-orange-500 ${
+                    className={`flex items-center gap-2 px-3 py-2.5 text-sm font-medium rounded-md transition-colors hover:bg-orange-50 hover:text-orange-500 ${
                       pathname === item.href ? 'text-orange-500 bg-orange-50' : 'text-gray-600'
                     }`}
                     onClick={() => setIsOpen(false)}
@@ -195,7 +204,7 @@ export function Navbar() {
                   <>
                     <Link
                       href="/jobs/my"
-                      className="flex items-center gap-2 px-3 py-2 text-sm font-medium rounded-md hover:bg-orange-50 hover:text-orange-500"
+                      className="flex items-center gap-2 px-3 py-2.5 text-sm font-medium rounded-md hover:bg-orange-50 hover:text-orange-500"
                       onClick={() => setIsOpen(false)}
                     >
                       <ClipboardList className="h-4 w-4" />
@@ -204,7 +213,7 @@ export function Navbar() {
                     {user?.role === 'provider' && (
                       <Link
                         href="/providers/me"
-                        className="flex items-center gap-2 px-3 py-2 text-sm font-medium rounded-md hover:bg-orange-50 hover:text-orange-500"
+                        className="flex items-center gap-2 px-3 py-2.5 text-sm font-medium rounded-md hover:bg-orange-50 hover:text-orange-500"
                         onClick={() => setIsOpen(false)}
                       >
                         <Briefcase className="h-4 w-4" />
@@ -213,14 +222,14 @@ export function Navbar() {
                     )}
                     <Link
                       href="/profile"
-                      className="flex items-center gap-2 px-3 py-2 text-sm font-medium rounded-md hover:bg-orange-50 hover:text-orange-500"
+                      className="flex items-center gap-2 px-3 py-2.5 text-sm font-medium rounded-md hover:bg-orange-50 hover:text-orange-500"
                       onClick={() => setIsOpen(false)}
                     >
                       <User className="h-4 w-4" />
                       Profile
                     </Link>
                     <button
-                      className="flex w-full items-center gap-2 px-3 py-2 text-sm font-medium rounded-md text-red-600 hover:bg-red-50"
+                      className="flex w-full items-center gap-2 px-3 py-2.5 text-sm font-medium rounded-md text-red-600 hover:bg-red-50"
                       onClick={handleLogout}
                     >
                       <LogOut className="h-4 w-4" />
@@ -231,7 +240,7 @@ export function Navbar() {
                   <>
                     <Link
                       href="/login"
-                      className="flex items-center gap-2 px-3 py-2 text-sm font-medium rounded-md hover:bg-orange-50 hover:text-orange-500"
+                      className="flex items-center gap-2 px-3 py-2.5 text-sm font-medium rounded-md hover:bg-orange-50 hover:text-orange-500"
                       onClick={() => setIsOpen(false)}
                     >
                       <User className="h-4 w-4" />
@@ -239,7 +248,7 @@ export function Navbar() {
                     </Link>
                     <Link
                       href="/register"
-                      className="mt-2 flex w-full items-center justify-center gap-2 rounded-md bg-gradient-to-r from-orange-500 to-amber-600 px-3 py-2 text-sm font-medium text-white hover:from-orange-600 hover:to-amber-700"
+                      className="mt-2 flex w-full items-center justify-center gap-2 rounded-md bg-gradient-to-r from-orange-500 to-amber-600 px-3 py-2.5 text-sm font-medium text-white hover:from-orange-600 hover:to-amber-700 transition-all duration-300"
                       onClick={() => setIsOpen(false)}
                     >
                       Get Started

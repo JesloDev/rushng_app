@@ -14,18 +14,18 @@ class AuditLog(db.Model):
     
     # Action details
     action = Column(String(255), nullable=False)
-    resource = Column(String(100), nullable=False)  # 'user', 'job', 'payment', etc.
+    resource = Column(String(100), nullable=False)
     resource_id = Column(String(36))
     
     # Context
     ip_address = Column(String(45))
     user_agent = Column(String(500))
-    method = Column(String(10))  # GET, POST, PUT, DELETE
+    method = Column(String(10))
     
     # Data
     changes = Column(JSONB, default={})
     
-    # Timestamps
+    # Timestamp
     created_at = Column(DateTime, default=datetime.utcnow)
     
     def __repr__(self):

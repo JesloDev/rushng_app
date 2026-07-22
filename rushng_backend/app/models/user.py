@@ -1,6 +1,6 @@
 from sqlalchemy.dialects.postgresql import UUID
 from sqlalchemy import Column, String, Boolean, DateTime, Text, Enum
-from datetime import datetime
+from datetime import datetime, timezone
 import uuid
 import enum
 
@@ -13,6 +13,16 @@ class UserRole(str, enum.Enum):
     ADMIN = "admin"
     SUPPORT = "support"
 
+    @classmethod
+    def _missing_(cls, value):
+        # Handles case-insensitive lookups (e.g., UserRole("CUSTOMER") -> UserRole.CUSTOMER)
+        if isinstance(value, str):
+            value = value.lower()
+            for member in cls:
+                if member.value == value:
+                    return member
+        return None
+
 
 class User(db.Model):
     __tablename__ = 'users'
@@ -22,16 +32,27 @@ class User(db.Model):
     phone = Column(String(20), unique=True, nullable=False, index=True)
     password_hash = Column(String(255), nullable=False)
     full_name = Column(String(255), nullable=False)
-    role = Column(Enum(UserRole), nullable=False, default=UserRole.CUSTOMER)
+    
+    # Instruct SQLAlchemy to send lowercase enum values ("customer") to PostgreSQL
+    role = Column(
+        Enum(
+            UserRole,
+            name='user_role',
+            values_callable=lambda x: [e.value for e in x],
+            native_enum=True
+        ),
+        nullable=False,
+        default=UserRole.CUSTOMER
+    )
     
     # Verification
     is_verified = Column(Boolean, default=False)
-    verification_code = Column(String(6))
-    verification_sent_at = Column(DateTime)
+    verification_code = Column(String(255))
+    verification_sent_at = Column(DateTime(timezone=True))
     
     # Personal Information
-    nin = Column(String(11), unique=True)  # National Identification Number
-    bvn = Column(String(11), unique=True)  # Bank Verification Number
+    nin = Column(String(11), unique=True)
+    bvn = Column(String(11), unique=True)
     address = Column(Text)
     city = Column(String(100))
     state = Column(String(100))
@@ -40,16 +61,24 @@ class User(db.Model):
     
     # Account Status
     is_active = Column(Boolean, default=True)
-    is_verified_provider = Column(Boolean, default=False)  # For providers
-    verification_status = Column(String(50), default='pending')  # pending, verified, rejected
+    is_verified_provider = Column(Boolean, default=False)
+    verification_status = Column(String(50), default='pending')
+    
+    # Password Reset
+    reset_token = Column(String(255))
+    reset_token_expires = Column(DateTime(timezone=True))
     
     # Timestamps
-    created_at = Column(DateTime, default=datetime.utcnow)
-    updated_at = Column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
-    last_login = Column(DateTime)
+    created_at = Column(DateTime(timezone=True), default=lambda: datetime.now(timezone.utc))
+    updated_at = Column(
+        DateTime(timezone=True), 
+        default=lambda: datetime.now(timezone.utc), 
+        onupdate=lambda: datetime.now(timezone.utc)
+    )
+    last_login = Column(DateTime(timezone=True))
     
     # Soft Delete
-    deleted_at = Column(DateTime)
+    deleted_at = Column(DateTime(timezone=True))
     deleted_by = Column(UUID(as_uuid=True))
     deletion_reason = Column(Text)
     
@@ -62,7 +91,14 @@ class User(db.Model):
     violations_reported = db.relationship('Violation', foreign_keys='Violation.reported_by', back_populates='reporter')
     violations_received = db.relationship('Violation', foreign_keys='Violation.user_id', back_populates='user')
     notifications = db.relationship('Notification', back_populates='user')
+    refresh_tokens = db.relationship('RefreshToken', back_populates='user', lazy='dynamic')
     
+    def __init__(self, **kwargs):
+        # Gracefully handle string-to-Enum conversion upon initialization
+        if 'role' in kwargs and isinstance(kwargs['role'], str):
+            kwargs['role'] = UserRole(kwargs['role'])
+        super(User, self).__init__(**kwargs)
+
     def __repr__(self):
         return f'<User {self.email}>'
     
@@ -73,8 +109,9 @@ class User(db.Model):
         return self.role == UserRole.PROVIDER or self.is_verified_provider
     
     def can_delete_account(self):
-        """Check if user qualifies for account deletion"""
-        from app.models.job import JobStatus
+        from app.models.job import Job, JobStatus
+        from app.models.violation import Violation
+        from datetime import timedelta
         
         # Check for active jobs
         active_jobs = Job.query.filter(
@@ -86,36 +123,25 @@ class User(db.Model):
             return False, "You have active jobs. Complete them first."
         
         # Check for recent violations (last 90 days)
-        from app.models.violation import Violation
-        from datetime import datetime, timedelta
+        cutoff_date = datetime.now(timezone.utc) - timedelta(days=90)
         recent_violations = Violation.query.filter(
             Violation.user_id == self.id,
             Violation.status == 'confirmed',
-            Violation.created_at > datetime.utcnow() - timedelta(days=90)
+            Violation.created_at > cutoff_date
         ).count()
         
         if recent_violations > 0:
-            return False, f"You have {recent_violations} recent violations. Contact support."
-        
-        # Check for critical violations
-        critical_violations = Violation.query.filter(
-            Violation.user_id == self.id,
-            Violation.severity == 'critical'
-        ).count()
-        
-        if critical_violations > 0:
-            return False, "Your account has critical violations. Contact support."
+            return False, f"You have {recent_violations} recent violations."
         
         return True, "Account eligible for deletion"
     
     def to_dict(self, include_sensitive=False):
-        """Convert user to dictionary"""
         data = {
             'id': str(self.id),
             'email': self.email,
             'phone': self.phone,
             'full_name': self.full_name,
-            'role': self.role.value if self.role else None,
+            'role': self.role.value if hasattr(self.role, 'value') else str(self.role),
             'is_verified': self.is_verified,
             'is_active': self.is_active,
             'profile_picture': self.profile_picture,

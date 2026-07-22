@@ -1,4 +1,4 @@
-from sqlalchemy.dialects.postgresql import UUID, JSONB
+from sqlalchemy.dialects.postgresql import UUID, JSONB, ARRAY
 from sqlalchemy import Column, String, Text, Boolean, DateTime, ForeignKey
 from datetime import datetime
 import uuid
@@ -12,20 +12,18 @@ class Notification(db.Model):
     id = Column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
     user_id = Column(UUID(as_uuid=True), ForeignKey('users.id'), nullable=False)
     
-    # Notification details
+    # Details
     title = Column(String(255), nullable=False)
     message = Column(Text, nullable=False)
-    type = Column(String(50), nullable=False)  # 'job', 'payment', 'rating', 'system', etc.
-    
-    # Metadata
-    metadata = Column(JSONB, default={})
+    type = Column(String(50), nullable=False)
+    notification_metadata = Column(JSONB, default={})  # RENAMED from 'metadata'
     
     # Status
     is_read = Column(Boolean, default=False)
     read_at = Column(DateTime)
     
     # Delivery
-    delivered_via = Column(ARRAY(String), default=[])  # ['email', 'sms', 'push']
+    delivered_via = Column(ARRAY(String), default=[])
     delivered_at = Column(DateTime)
     
     # Timestamps
@@ -39,7 +37,6 @@ class Notification(db.Model):
         return f'<Notification {self.title} - {self.type}>'
     
     def mark_as_read(self):
-        """Mark notification as read"""
         self.is_read = True
         self.read_at = datetime.utcnow()
     
@@ -50,7 +47,7 @@ class Notification(db.Model):
             'title': self.title,
             'message': self.message,
             'type': self.type,
-            'metadata': self.metadata,
+            'notification_metadata': self.notification_metadata,
             'is_read': self.is_read,
             'created_at': self.created_at.isoformat() if self.created_at else None,
         }

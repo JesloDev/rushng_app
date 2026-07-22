@@ -8,14 +8,7 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
-import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from '@/components/ui/select';
-import { Loader2, Eye, EyeOff, ArrowLeft, AlertCircle, CheckCircle2 } from 'lucide-react';
+import { Loader2, Eye, EyeOff, AlertCircle, CheckCircle2, ArrowLeft, Zap, Mail, Phone, User, Lock, UserPlus } from 'lucide-react';
 import { toast } from 'sonner';
 import { motion } from 'framer-motion';
 
@@ -26,7 +19,7 @@ export default function RegisterPage() {
   const [showConfirmPassword, setShowConfirmPassword] = useState(false);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  const [passwordStrength, setPasswordStrength] = useState({ score: 0, label: '', color: '' });
+  const [passwordStrength, setPasswordStrength] = useState({ score: 0, label: '', color: '', bgColor: '' });
   const [formData, setFormData] = useState({
     full_name: '',
     email: '',
@@ -36,40 +29,39 @@ export default function RegisterPage() {
     role: 'customer',
   });
 
-  // Redirect if already authenticated
   useEffect(() => {
     if (isAuthenticated) {
       router.push('/dashboard');
     }
   }, [isAuthenticated, router]);
 
-  // Password strength checker
   useEffect(() => {
     const checkStrength = (password: string) => {
       let score = 0;
       if (password.length >= 8) score++;
       if (/[a-z]/.test(password) && /[A-Z]/.test(password)) score++;
       if (/\d/.test(password)) score++;
-      if (/[^a-zA-Z0-9]/.test(password)) score++;
+      if (/[^A-Za-z0-9]/.test(password)) score++;
 
       const strengthMap = [
-        { label: 'Very Weak', color: 'text-red-500' },
-        { label: 'Weak', color: 'text-orange-500' },
-        { label: 'Medium', color: 'text-yellow-500' },
-        { label: 'Strong', color: 'text-green-500' },
-        { label: 'Very Strong', color: 'text-emerald-500' },
+        { label: 'Very Weak', color: 'text-red-500', bgColor: 'bg-red-500' },
+        { label: 'Weak', color: 'text-orange-500', bgColor: 'bg-orange-500' },
+        { label: 'Medium', color: 'text-yellow-500', bgColor: 'bg-yellow-500' },
+        { label: 'Strong', color: 'text-green-500', bgColor: 'bg-green-500' },
+        { label: 'Very Strong', color: 'text-emerald-500', bgColor: 'bg-emerald-500' },
       ];
       return {
         score,
         label: strengthMap[score].label,
         color: strengthMap[score].color,
+        bgColor: strengthMap[score].bgColor,
       };
     };
 
     if (formData.password) {
       setPasswordStrength(checkStrength(formData.password));
     } else {
-      setPasswordStrength({ score: 0, label: '', color: '' });
+      setPasswordStrength({ score: 0, label: '', color: '', bgColor: '' });
     }
   }, [formData.password]);
 
@@ -78,7 +70,6 @@ export default function RegisterPage() {
     setError(null);
     setIsSubmitting(true);
 
-    // Validation
     if (!formData.full_name || !formData.email || !formData.phone || !formData.password) {
       setError('Please fill in all fields');
       setIsSubmitting(false);
@@ -93,6 +84,20 @@ export default function RegisterPage() {
 
     if (formData.password.length < 8) {
       setError('Password must be at least 8 characters');
+      setIsSubmitting(false);
+      return;
+    }
+
+    const phoneRegex = /^(\+234|0)[789][01]\d{8}$/;
+    if (!phoneRegex.test(formData.phone)) {
+      setError('Please enter a valid Nigerian phone number (e.g., 08012345678)');
+      setIsSubmitting(false);
+      return;
+    }
+
+    const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+    if (!emailRegex.test(formData.email)) {
+      setError('Please enter a valid email address');
       setIsSubmitting(false);
       return;
     }
@@ -112,124 +117,157 @@ export default function RegisterPage() {
       } else {
         setError('Registration failed. Please try again.');
       }
-    } catch (err) {
-      setError('Something went wrong. Please try again.');
+    } catch (err: any) {
+      setError(err.message || 'Something went wrong. Please try again.');
     } finally {
       setIsSubmitting(false);
     }
   };
 
   return (
-    <div className="min-h-screen flex items-center justify-center bg-gradient-to-b from-orange-50 to-white py-12 px-4 sm:px-6 lg:px-8">
+    <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-orange-50 via-white to-orange-50/30 py-12 px-4 sm:px-6 lg:px-8">
+      <div className="absolute inset-0 -z-10 overflow-hidden">
+        <div className="absolute -top-40 -right-40 h-80 w-80 rounded-full bg-orange-100/30 blur-3xl" />
+        <div className="absolute -bottom-40 -left-40 h-80 w-80 rounded-full bg-amber-100/20 blur-3xl" />
+      </div>
+
       <motion.div
         initial={{ opacity: 0, y: 20 }}
         animate={{ opacity: 1, y: 0 }}
         transition={{ duration: 0.5 }}
         className="w-full max-w-md"
       >
-        <Card className="border-0 shadow-lg">
+        <Card className="border-0 shadow-2xl bg-white/80 backdrop-blur-sm">
           <CardHeader className="space-y-1 text-center">
-            <div className="flex justify-center mb-4">
-              <div className="rounded-full bg-gradient-to-r from-orange-500 to-amber-600 p-3">
-                <svg className="h-8 w-8 text-white" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M18 9v3m0 0v3m0-3h3m-3 0h-3m-2-5a4 4 0 11-8 0 4 4 0 018 0zM3 20a6 6 0 0112 0v1H3v-1z" />
-                </svg>
+            <motion.div
+              initial={{ scale: 0 }}
+              animate={{ scale: 1 }}
+              transition={{ type: 'spring', stiffness: 200, delay: 0.1 }}
+              className="flex justify-center mb-4"
+            >
+              <div className="rounded-full bg-gradient-to-r from-orange-500 to-amber-600 p-3 shadow-lg shadow-orange-500/25">
+                <UserPlus className="h-8 w-8 text-white" />
               </div>
-            </div>
-            <CardTitle className="text-2xl font-bold">Create Account</CardTitle>
-            <CardDescription>
-              Join RUSHNG and start finding trusted providers
+            </motion.div>
+            <CardTitle className="text-3xl font-bold bg-gradient-to-r from-orange-500 to-amber-600 bg-clip-text text-transparent">
+              Create Account
+            </CardTitle>
+            <CardDescription className="text-base">
+              Join RUSHNG and start your journey
             </CardDescription>
           </CardHeader>
           <CardContent>
             <form onSubmit={handleSubmit} className="space-y-4">
-              {/* Error Message */}
               {error && (
-                <div className="flex items-center gap-2 rounded-lg border border-red-200 bg-red-50 p-3 text-sm text-red-800">
+                <motion.div
+                  initial={{ opacity: 0, y: -10 }}
+                  animate={{ opacity: 1, y: 0 }}
+                  className="flex items-center gap-2 rounded-lg border border-red-200 bg-red-50 p-3 text-sm text-red-800"
+                >
                   <AlertCircle className="h-4 w-4 shrink-0" />
                   <span>{error}</span>
-                </div>
+                </motion.div>
               )}
 
-              {/* Full Name */}
               <div className="space-y-2">
-                <Label htmlFor="full_name">Full Name *</Label>
-                <Input
-                  id="full_name"
-                  placeholder="John Doe"
-                  value={formData.full_name}
-                  onChange={(e) => setFormData({ ...formData, full_name: e.target.value })}
-                  required
-                  disabled={isSubmitting}
-                  className="h-11"
-                />
-              </div>
-
-              {/* Email */}
-              <div className="space-y-2">
-                <Label htmlFor="email">Email Address *</Label>
-                <Input
-                  id="email"
-                  type="email"
-                  placeholder="you@example.com"
-                  value={formData.email}
-                  onChange={(e) => setFormData({ ...formData, email: e.target.value })}
-                  required
-                  disabled={isSubmitting}
-                  className="h-11"
-                />
-              </div>
-
-              {/* Phone */}
-              <div className="space-y-2">
-                <Label htmlFor="phone">Phone Number *</Label>
-                <Input
-                  id="phone"
-                  type="tel"
-                  placeholder="+2348012345678"
-                  value={formData.phone}
-                  onChange={(e) => setFormData({ ...formData, phone: e.target.value })}
-                  required
-                  disabled={isSubmitting}
-                  className="h-11"
-                />
-              </div>
-
-              {/* Role */}
-              <div className="space-y-2">
-                <Label htmlFor="role">I want to...</Label>
-                <Select
-                  value={formData.role}
-                  onValueChange={(value) => setFormData({ ...formData, role: value })}
-                  disabled={isSubmitting}
-                >
-                  <SelectTrigger className="h-11">
-                    <SelectValue placeholder="Select your role" />
-                  </SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="customer">Hire Services (Customer)</SelectItem>
-                    <SelectItem value="provider">Provide Services (Provider)</SelectItem>
-                  </SelectContent>
-                </Select>
-              </div>
-
-              {/* Password */}
-              <div className="space-y-2">
-                <Label htmlFor="password">Password *</Label>
+                <Label htmlFor="full_name" className="text-sm font-medium">Full Name</Label>
                 <div className="relative">
+                  <User className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+                  <Input
+                    id="full_name"
+                    placeholder="Enter your full name (e.g., John Doe)"
+                    value={formData.full_name}
+                    onChange={(e) => setFormData({ ...formData, full_name: e.target.value })}
+                    required
+                    disabled={isSubmitting}
+                    className="h-12 pl-10 border-gray-200 focus:border-orange-500 focus:ring-orange-500"
+                  />
+                </div>
+              </div>
+
+              <div className="space-y-2">
+                <Label htmlFor="email" className="text-sm font-medium">Email Address</Label>
+                <div className="relative">
+                  <Mail className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+                  <Input
+                    id="email"
+                    type="email"
+                    placeholder="Enter your email address (e.g., name@email.com)"
+                    value={formData.email}
+                    onChange={(e) => setFormData({ ...formData, email: e.target.value })}
+                    required
+                    disabled={isSubmitting}
+                    className="h-12 pl-10 border-gray-200 focus:border-orange-500 focus:ring-orange-500"
+                  />
+                </div>
+              </div>
+
+              <div className="space-y-2">
+                <Label htmlFor="phone" className="text-sm font-medium">Phone Number</Label>
+                <div className="relative">
+                  <Phone className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+                  <Input
+                    id="phone"
+                    type="tel"
+                    placeholder="Enter your phone number (e.g., 08012345678 or +2348012345678)"
+                    value={formData.phone}
+                    onChange={(e) => setFormData({ ...formData, phone: e.target.value })}
+                    required
+                    disabled={isSubmitting}
+                    className="h-12 pl-10 border-gray-200 focus:border-orange-500 focus:ring-orange-500"
+                  />
+                </div>
+                <p className="text-xs text-muted-foreground">We'll send a verification code to this number</p>
+              </div>
+
+              <div className="space-y-2">
+                <Label className="text-sm font-medium">I want to...</Label>
+                <div className="grid grid-cols-2 gap-3">
+                  {[
+                    { value: 'customer', label: 'Hire Services', icon: '👤', desc: 'Find and hire providers' },
+                    { value: 'provider', label: 'Provide Services', icon: '🔧', desc: 'Offer your services' },
+                  ].map((option) => (
+                    <label
+                      key={option.value}
+                      className={`relative flex flex-col items-center justify-center p-4 rounded-xl border-2 cursor-pointer transition-all duration-200 ${
+                        formData.role === option.value
+                          ? 'border-orange-500 bg-orange-50 shadow-md'
+                          : 'border-gray-200 hover:border-orange-200 hover:bg-orange-50/50'
+                      }`}
+                    >
+                      <input
+                        type="radio"
+                        name="role"
+                        value={option.value}
+                        checked={formData.role === option.value}
+                        onChange={(e) => setFormData({ ...formData, role: e.target.value })}
+                        className="sr-only"
+                      />
+                      <span className="text-2xl mb-1">{option.icon}</span>
+                      <span className="text-sm font-medium">{option.label}</span>
+                      <span className="text-[10px] text-muted-foreground">{option.desc}</span>
+                    </label>
+                  ))}
+                </div>
+              </div>
+
+              <div className="space-y-2">
+                <Label htmlFor="password" className="text-sm font-medium">Password</Label>
+                <div className="relative">
+                  <Lock className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
                   <Input
                     id="password"
                     type={showPassword ? 'text' : 'password'}
-                    placeholder="••••••••"
+                    placeholder="Create a password (minimum 8 characters)"
                     value={formData.password}
                     onChange={(e) => setFormData({ ...formData, password: e.target.value })}
                     required
                     disabled={isSubmitting}
-                    className="h-11 pr-10"
+                    className="h-12 pl-10 pr-12 border-gray-200 focus:border-orange-500 focus:ring-orange-500"
                   />
                   <button
                     type="button"
-                    className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-500 hover:text-gray-700"
+                    className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-400 hover:text-gray-600 transition-colors"
                     onClick={() => setShowPassword(!showPassword)}
                   >
                     {showPassword ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
@@ -239,12 +277,7 @@ export default function RegisterPage() {
                   <div className="space-y-1">
                     <div className="h-1.5 w-full rounded-full bg-gray-200 overflow-hidden">
                       <div
-                        className={`h-full rounded-full transition-all duration-300 ${
-                          passwordStrength.score <= 1 ? 'bg-red-500' :
-                          passwordStrength.score === 2 ? 'bg-yellow-500' :
-                          passwordStrength.score === 3 ? 'bg-green-500' :
-                          'bg-emerald-500'
-                        }`}
+                        className={`h-full rounded-full transition-all duration-300 ${passwordStrength.bgColor}`}
                         style={{ width: `${(passwordStrength.score / 4) * 100}%` }}
                       />
                     </div>
@@ -253,43 +286,46 @@ export default function RegisterPage() {
                     </p>
                   </div>
                 )}
-                <p className="text-xs text-muted-foreground">Minimum 8 characters with letters and numbers</p>
+                <p className="text-xs text-muted-foreground">Use 8+ characters with letters and numbers</p>
               </div>
 
-              {/* Confirm Password */}
               <div className="space-y-2">
-                <Label htmlFor="confirm_password">Confirm Password *</Label>
+                <Label htmlFor="confirm_password" className="text-sm font-medium">Confirm Password</Label>
                 <div className="relative">
+                  <Lock className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
                   <Input
                     id="confirm_password"
                     type={showConfirmPassword ? 'text' : 'password'}
-                    placeholder="••••••••"
+                    placeholder="Re-enter your password to confirm"
                     value={formData.confirm_password}
                     onChange={(e) => setFormData({ ...formData, confirm_password: e.target.value })}
                     required
                     disabled={isSubmitting}
-                    className="h-11 pr-10"
+                    className="h-12 pl-10 pr-12 border-gray-200 focus:border-orange-500 focus:ring-orange-500"
                   />
                   <button
                     type="button"
-                    className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-500 hover:text-gray-700"
+                    className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-400 hover:text-gray-600 transition-colors"
                     onClick={() => setShowConfirmPassword(!showConfirmPassword)}
                   >
                     {showConfirmPassword ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
                   </button>
                 </div>
                 {formData.confirm_password && formData.password === formData.confirm_password && (
-                  <p className="flex items-center gap-1 text-xs text-green-600">
+                  <motion.p
+                    initial={{ opacity: 0, y: -5 }}
+                    animate={{ opacity: 1, y: 0 }}
+                    className="flex items-center gap-1 text-xs text-green-600"
+                  >
                     <CheckCircle2 className="h-3 w-3" />
-                    Passwords match
-                  </p>
+                    Passwords match ✓
+                  </motion.p>
                 )}
               </div>
 
-              {/* Submit Button */}
               <Button
                 type="submit"
-                className="w-full h-11 bg-gradient-to-r from-orange-500 to-amber-600 text-white hover:from-orange-600 hover:to-amber-700"
+                className="w-full h-12 bg-gradient-to-r from-orange-500 to-amber-600 text-white hover:from-orange-600 hover:to-amber-700 shadow-lg shadow-orange-500/25 hover:shadow-xl hover:shadow-orange-500/30 transition-all duration-300"
                 disabled={isSubmitting}
               >
                 {isSubmitting ? (
@@ -302,18 +338,27 @@ export default function RegisterPage() {
                 )}
               </Button>
 
-              {/* Login Link */}
-              <div className="text-center text-sm text-muted-foreground">
-                Already have an account?{' '}
-                <Link
-                  href="/login"
-                  className="font-medium text-orange-500 hover:text-orange-600 hover:underline"
-                >
-                  Login
-                </Link>
+              <div className="relative">
+                <div className="absolute inset-0 flex items-center">
+                  <div className="w-full border-t border-gray-200" />
+                </div>
+                <div className="relative flex justify-center text-sm">
+                  <span className="bg-white px-4 text-muted-foreground">or</span>
+                </div>
               </div>
 
-              {/* Back to Home */}
+              <div className="text-center">
+                <p className="text-sm text-muted-foreground">
+                  Already have an account?{' '}
+                  <Link
+                    href="/login"
+                    className="font-semibold text-orange-500 hover:text-orange-600 hover:underline"
+                  >
+                    Sign in
+                  </Link>
+                </p>
+              </div>
+
               <div className="text-center">
                 <Link
                   href="/"

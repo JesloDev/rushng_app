@@ -1,5 +1,5 @@
 from sqlalchemy.dialects.postgresql import UUID, JSONB
-from sqlalchemy import Column, String, Text, DateTime, ForeignKey, Integer, Enum
+from sqlalchemy import Column, String, Text, Integer, DateTime, ForeignKey, Enum
 from datetime import datetime
 import uuid
 import enum
@@ -91,13 +91,11 @@ class Violation(db.Model):
         return f'<Violation {self.type} - {self.status}>'
     
     def confirm(self, reviewer_id, points=0):
-        """Confirm a violation and apply penalty"""
         self.status = ViolationStatus.CONFIRMED
         self.reviewed_by = reviewer_id
         self.reviewed_at = datetime.utcnow()
         self.points_deducted = points
         
-        # Apply penalty based on severity
         if self.severity == ViolationSeverity.MINOR:
             self.penalty_type = PenaltyType.WARNING
             self.penalty_details = {'duration_days': 7}
@@ -109,25 +107,21 @@ class Violation(db.Model):
             self.penalty_details = {'permanent': True}
     
     def dismiss(self, reviewer_id, reason):
-        """Dismiss a violation"""
         self.status = ViolationStatus.DISMISSED
         self.reviewed_by = reviewer_id
         self.reviewed_at = datetime.utcnow()
         self.resolution = reason
     
     def appeal(self, reason):
-        """Appeal a violation"""
         self.status = ViolationStatus.APPEALED
         self.appeal_reason = reason
         self.appeal_at = datetime.utcnow()
     
     def resolve(self, resolution):
-        """Resolve an appealed violation"""
         self.status = ViolationStatus.RESOLVED
         self.resolution = resolution
     
     def get_points(self):
-        """Get points deducted for this violation"""
         if self.severity == ViolationSeverity.MINOR:
             return 3
         elif self.severity == ViolationSeverity.MAJOR:

@@ -8,7 +8,7 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
-import { Loader2, ArrowLeft, CheckCircle2, AlertCircle, Clock } from 'lucide-react';
+import { Loader2, ArrowLeft, CheckCircle2, AlertCircle, Clock, Zap, Mail } from 'lucide-react';
 import { toast } from 'sonner';
 import { motion } from 'framer-motion';
 
@@ -24,13 +24,11 @@ export default function VerifyPage() {
   const [canResend, setCanResend] = useState(false);
 
   useEffect(() => {
-    // Get email from localStorage if available
     const storedEmail = localStorage.getItem('verification_email');
     if (storedEmail) {
       setEmail(storedEmail);
     }
 
-    // Start timer for resend
     const interval = setInterval(() => {
       setTimer((prev) => {
         if (prev <= 1) {
@@ -83,7 +81,6 @@ export default function VerifyPage() {
       toast.success('Verification code resent!');
       setTimer(60);
       setCanResend(false);
-      // Restart timer
       const interval = setInterval(() => {
         setTimer((prev) => {
           if (prev <= 1) {
@@ -103,25 +100,29 @@ export default function VerifyPage() {
 
   if (success) {
     return (
-      <div className="min-h-screen flex items-center justify-center bg-gradient-to-b from-orange-50 to-white py-12 px-4">
+      <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-orange-50 via-white to-orange-50/30 py-12 px-4">
         <motion.div
           initial={{ opacity: 0, scale: 0.9 }}
           animate={{ opacity: 1, scale: 1 }}
           className="w-full max-w-md"
         >
-          <Card className="border-0 shadow-lg">
+          <Card className="border-0 shadow-2xl bg-white/80 backdrop-blur-sm">
             <CardContent className="pt-8 text-center">
-              <div className="flex justify-center mb-4">
+              <motion.div
+                initial={{ scale: 0 }}
+                animate={{ scale: 1 }}
+                transition={{ type: 'spring', stiffness: 200, delay: 0.2 }}
+                className="flex justify-center mb-4"
+              >
                 <div className="rounded-full bg-green-100 p-4">
                   <CheckCircle2 className="h-12 w-12 text-green-600" />
                 </div>
-              </div>
+              </motion.div>
               <h2 className="text-2xl font-bold mb-2">Account Verified! 🎉</h2>
-              <p className="text-muted-foreground mb-4">
-                Your account has been successfully verified.
-                Redirecting to login...
+              <p className="text-muted-foreground mb-6">
+                Your account has been successfully verified. Redirecting to login...
               </p>
-              <Button onClick={() => router.push('/login')} className="w-full">
+              <Button onClick={() => router.push('/login')} className="w-full gradient-rush text-white">
                 Go to Login
               </Button>
             </CardContent>
@@ -132,70 +133,86 @@ export default function VerifyPage() {
   }
 
   return (
-    <div className="min-h-screen flex items-center justify-center bg-gradient-to-b from-orange-50 to-white py-12 px-4 sm:px-6 lg:px-8">
+    <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-orange-50 via-white to-orange-50/30 py-12 px-4 sm:px-6 lg:px-8">
+      <div className="absolute inset-0 -z-10 overflow-hidden">
+        <div className="absolute -top-40 -right-40 h-80 w-80 rounded-full bg-orange-100/30 blur-3xl" />
+        <div className="absolute -bottom-40 -left-40 h-80 w-80 rounded-full bg-amber-100/20 blur-3xl" />
+      </div>
+
       <motion.div
         initial={{ opacity: 0, y: 20 }}
         animate={{ opacity: 1, y: 0 }}
         transition={{ duration: 0.5 }}
         className="w-full max-w-md"
       >
-        <Card className="border-0 shadow-lg">
+        <Card className="border-0 shadow-2xl bg-white/80 backdrop-blur-sm">
           <CardHeader className="space-y-1 text-center">
-            <div className="flex justify-center mb-4">
-              <div className="rounded-full bg-orange-100 p-3">
-                <Clock className="h-8 w-8 text-orange-600" />
+            <motion.div
+              initial={{ scale: 0 }}
+              animate={{ scale: 1 }}
+              transition={{ type: 'spring', stiffness: 200, delay: 0.1 }}
+              className="flex justify-center mb-4"
+            >
+              <div className="rounded-full bg-gradient-to-r from-orange-500 to-amber-600 p-3 shadow-lg shadow-orange-500/25">
+                <Clock className="h-8 w-8 text-white" />
               </div>
-            </div>
-            <CardTitle className="text-2xl font-bold">Verify Your Account</CardTitle>
-            <CardDescription>
+            </motion.div>
+            <CardTitle className="text-3xl font-bold bg-gradient-to-r from-orange-500 to-amber-600 bg-clip-text text-transparent">
+              Verify Your Account
+            </CardTitle>
+            <CardDescription className="text-base">
               Enter the verification code sent to your email
             </CardDescription>
           </CardHeader>
           <CardContent>
-            <form onSubmit={handleSubmit} className="space-y-4">
-              {/* Error Message */}
+            <form onSubmit={handleSubmit} className="space-y-5">
               {error && (
-                <div className="flex items-center gap-2 rounded-lg border border-red-200 bg-red-50 p-3 text-sm text-red-800">
+                <motion.div
+                  initial={{ opacity: 0, y: -10 }}
+                  animate={{ opacity: 1, y: 0 }}
+                  className="flex items-center gap-2 rounded-lg border border-red-200 bg-red-50 p-3 text-sm text-red-800"
+                >
                   <AlertCircle className="h-4 w-4 shrink-0" />
                   <span>{error}</span>
-                </div>
+                </motion.div>
               )}
 
-              {/* Email */}
               <div className="space-y-2">
-                <Label htmlFor="email">Email Address</Label>
-                <Input
-                  id="email"
-                  type="email"
-                  placeholder="you@example.com"
-                  value={email}
-                  onChange={(e) => setEmail(e.target.value)}
-                  required
-                  disabled={isSubmitting}
-                  className="h-11"
-                />
+                <Label htmlFor="email" className="text-sm font-medium">Email Address</Label>
+                <div className="relative">
+                  <Mail className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+                  <Input
+                    id="email"
+                    type="email"
+                    placeholder="Enter the email address you used to sign up"
+                    value={email}
+                    onChange={(e) => setEmail(e.target.value)}
+                    required
+                    disabled={isSubmitting}
+                    className="h-12 pl-10 border-gray-200 focus:border-orange-500 focus:ring-orange-500"
+                  />
+                </div>
               </div>
 
-              {/* Verification Code */}
               <div className="space-y-2">
-                <Label htmlFor="code">Verification Code</Label>
+                <Label htmlFor="code" className="text-sm font-medium">Verification Code</Label>
                 <Input
                   id="code"
                   type="text"
-                  placeholder="Enter 6-digit code"
+                  placeholder="Enter the 6-digit code from your email"
                   maxLength={6}
                   value={code}
                   onChange={(e) => setCode(e.target.value.replace(/\D/g, ''))}
                   required
                   disabled={isSubmitting}
-                  className="h-11 text-center text-lg tracking-widest"
+                  className="h-12 text-center text-lg tracking-widest font-mono border-gray-200 focus:border-orange-500 focus:ring-orange-500"
                 />
+                <p className="text-xs text-muted-foreground">Check your inbox for the 6-digit verification code</p>
               </div>
 
-              {/* Submit Button */}
               <Button
                 type="submit"
-                className="w-full h-11 bg-gradient-to-r from-orange-500 to-amber-600 text-white hover:from-orange-600 hover:to-amber-700"
+                className="w-full h-12 bg-gradient-to-r from-orange-500 to-amber-600 text-white hover:from-orange-600 hover:to-amber-700 shadow-lg shadow-orange-500/25 hover:shadow-xl hover:shadow-orange-500/30 transition-all duration-300"
                 disabled={isSubmitting || code.length < 6}
               >
                 {isSubmitting ? (
@@ -208,29 +225,30 @@ export default function VerifyPage() {
                 )}
               </Button>
 
-              {/* Resend Code */}
               <div className="text-center">
-                <button
-                  type="button"
-                  onClick={handleResend}
-                  disabled={!canResend || isResending}
-                  className="text-sm text-orange-500 hover:text-orange-600 disabled:text-gray-400 disabled:cursor-not-allowed"
-                >
-                  {isResending ? (
-                    <>
-                      <Loader2 className="mr-2 h-3 w-3 animate-spin inline" />
-                      Resending...
-                    </>
-                  ) : canResend ? (
-                    'Resend verification code'
-                  ) : (
-                    `Resend in ${timer}s`
-                  )}
-                </button>
+                <p className="text-sm text-muted-foreground">
+                  Didn't receive a code?{' '}
+                  <button
+                    type="button"
+                    onClick={handleResend}
+                    disabled={!canResend || isResending}
+                    className="text-orange-500 hover:text-orange-600 disabled:text-gray-400 disabled:cursor-not-allowed font-medium"
+                  >
+                    {isResending ? (
+                      <>
+                        <Loader2 className="mr-1 h-3 w-3 animate-spin inline" />
+                        Resending...
+                      </>
+                    ) : canResend ? (
+                      'Resend code'
+                    ) : (
+                      `Resend in ${timer}s`
+                    )}
+                  </button>
+                </p>
               </div>
 
-              {/* Back to Home */}
-              <div className="text-center pt-2">
+              <div className="text-center">
                 <Link
                   href="/"
                   className="inline-flex items-center gap-1 text-sm text-muted-foreground hover:text-orange-500 transition-colors"
