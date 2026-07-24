@@ -8,7 +8,6 @@ interface LoadingSpinnerProps {
   className?: string;
   text?: string;
   fullScreen?: boolean;
-  variant?: 'default' | 'overlay';
 }
 
 export function LoadingSpinner({
@@ -16,7 +15,6 @@ export function LoadingSpinner({
   className,
   text = 'Loading...',
   fullScreen = false,
-  variant = 'default',
 }: LoadingSpinnerProps) {
   const sizeClasses = {
     sm: 'h-4 w-4',
@@ -25,17 +23,14 @@ export function LoadingSpinner({
     xl: 'h-16 w-16',
   };
 
-  const containerClasses = cn(
-    'flex flex-col items-center justify-center gap-2',
-    fullScreen && 'fixed inset-0 z-50 bg-white/80 backdrop-blur-sm',
-    variant === 'overlay' && 'absolute inset-0 z-10 bg-white/60 rounded-lg',
-    className
-  );
-
   return (
-    <div className={containerClasses}>
+    <div className={cn(
+      'flex flex-col items-center justify-center gap-3',
+      fullScreen && 'fixed inset-0 z-50 bg-white/80 backdrop-blur-sm',
+      className
+    )}>
       <Loader2 className={cn('animate-spin text-orange-500', sizeClasses[size])} />
-      {text && <p className="text-sm text-muted-foreground">{text}</p>}
+      {text && <p className="text-sm text-muted-foreground animate-pulse">{text}</p>}
     </div>
   );
 }

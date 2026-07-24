@@ -1,59 +1,102 @@
-from flask import Blueprint, request, jsonify
-from flask_jwt_extended import jwt_required, get_jwt_identity
 from datetime import datetime
-from geoalchemy2.functions import ST_Distance, ST_SetSRID, ST_Point
-import json
+from math import radians, sin, cos, sqrt, atan2
+
+from flask import Blueprint, request, jsonify, current_app
+from flask_jwt_extended import jwt_required
+from geoalchemy2 import WKTElement, Geography
+from geoalchemy2.functions import ST_DWithin, ST_SetSRID, ST_Point
+from geoalchemy2.shape import to_shape
+from sqlalchemy.orm import joinedload
 
 from app.core.database import db
 from app.core.dependencies import get_current_user, customer_required, provider_required
-from app.core.security import generate_otp, hash_otp, verify_otp
-from app.models.user import User
+from app.core.logging import log_business_event
+from app.core.security import verify_otp
 from app.models.provider import Provider
 from app.models.job import Job, JobStatus, JobCategory
-from app.models.payment import Payment, PaymentStatus
+from app.models.user import User
 from app.services.notification_service import NotificationService
-from app.services.verification_service import VerificationService
-from app.services.geo_service import GeoService
+from app.services.payment_service import PaymentService
 from app.utils.validators import validate_location
-from app.core.logging import log_user_action, log_business_event
 
 jobs_bp = Blueprint('jobs', __name__)
 
+
+# --- Helper Functions ---
+
+def calculate_distance(lat1, lng1, lat2, lng2):
+    """Calculate Haversine distance between two points in km."""
+    R = 6371.0  # Earth radius in km
+    lat1, lng1, lat2, lng2 = map(radians, [lat1, lng1, lat2, lng2])
+    dlat = lat2 - lat1
+    dlng = lng2 - lng1
+    a = sin(dlat / 2)**2 + cos(lat1) * cos(lat2) * sin(dlng / 2)**2
+    c = 2 * atan2(sqrt(a), sqrt(1 - a))
+    return R * c
+
+
+def get_location_coords(location):
+    """Extract lat/lng from GeoAlchemy location safely using Shapely."""
+    if not location:
+        return None, None
+    try:
+        shape = to_shape(location)
+        return shape.y, shape.x  # lat, lng
+    except Exception:
+        return None, None
+
+
+def get_nearby_providers(lat, lng, radius_km):
+    """Get available providers within radius (in km)."""
+    point = ST_SetSRID(ST_Point(lng, lat), 4326)
+    providers = Provider.query.filter(
+        ST_DWithin(Provider.location.cast(Geography), point.cast(Geography), radius_km * 1000),
+        Provider.is_available == True
+    ).limit(20).all()
+    return providers
+
+
+def validate_proximity(provider_lat, provider_lng, job_location, max_distance_km=0.1):
+    """Ensures provider is within allowed distance (default 100m) of job location."""
+    job_lat, job_lng = get_location_coords(job_location)
+    if job_lat is None or job_lng is None:
+        return False, "Invalid job location stored on server."
+    
+    distance = calculate_distance(provider_lat, provider_lng, job_lat, job_lng)
+    if distance > max_distance_km:
+        return False, f"You are {distance * 1000:.0f}m away from job location. Must be within {int(max_distance_km * 1000)}m."
+    return True, None
+
+
+# --- Blueprint Routes ---
 
 @jobs_bp.route('/', methods=['POST'])
 @jwt_required()
 @customer_required
 def post_job():
-    """Post a new job"""
-    data = request.get_json()
+    """Post a new job."""
+    data = request.get_json() or {}
     user = get_current_user()
-    
-    # Validate required fields
+
     required_fields = ['category', 'title', 'description', 'address', 'lat', 'lng']
     for field in required_fields:
         if not data.get(field):
-            return jsonify({
-                'success': False,
-                'error': f'Missing required field: {field}'
-            }), 400
-    
-    # Validate category
+            return jsonify({'success': False, 'error': f'Missing required field: {field}'}), 400
+
     try:
         category = JobCategory(data['category'])
     except ValueError:
         return jsonify({
             'success': False,
-            'error': f'Invalid category. Valid: {[c.value for c in JobCategory]}'
+            'error': f'Invalid category. Valid options: {[c.value for c in JobCategory]}'
         }), 400
-    
-    # Validate location
+
     if not validate_location(data['lat'], data['lng']):
-        return jsonify({
-            'success': False,
-            'error': 'Invalid location coordinates'
-        }), 400
-    
-    # Create job
+        return jsonify({'success': False, 'error': 'Invalid location coordinates'}), 400
+
+    # Format Point cleanly for GeoAlchemy
+    point_wkt = WKTElement(f'POINT({data["lng"]} {data["lat"]})', srid=4326)
+
     job = Job(
         customer_id=user.id,
         category=category,
@@ -63,26 +106,25 @@ def post_job():
         address=data['address'],
         city=data.get('city'),
         state=data.get('state'),
-        location=f'POINT({data["lng"]} {data["lat"]})',  # GeoAlchemy uses POINT(lng lat)
+        location=point_wkt,
         estimated_price=data.get('estimated_price'),
         start_time=data.get('start_time'),
         end_time=data.get('end_time'),
         status=JobStatus.POSTED
     )
-    
+
     db.session.add(job)
     db.session.commit()
-    
-    log_business_event(app, 'job_posted', {
+
+    log_business_event(current_app, 'job_posted', {
         'job_id': str(job.id),
         'customer_id': str(user.id),
         'category': job.category.value
     })
-    
-    # Notify nearby providers (if any)
+
+    # Async / Soft notify providers
     try:
-        # Get providers within 10km
-        nearby_providers = get_nearby_providers(data['lat'], data['lng'], 10)
+        nearby_providers = get_nearby_providers(data['lat'], data['lng'], radius_km=10)
         for provider in nearby_providers:
             if provider.user and provider.user.is_active:
                 NotificationService.send_job_notification(
@@ -91,8 +133,8 @@ def post_job():
                     job.estimated_price or 0
                 )
     except Exception as e:
-        app.logger.error(f"Failed to notify providers: {e}")
-    
+        current_app.logger.error(f"Failed to notify providers: {e}")
+
     return jsonify({
         'success': True,
         'message': 'Job posted successfully',
@@ -107,7 +149,7 @@ def post_job():
 
 @jobs_bp.route('/', methods=['GET'])
 def get_jobs():
-    """Get jobs with filters"""
+    """Get jobs with filters and eager loading."""
     page = request.args.get('page', 1, type=int)
     per_page = request.args.get('per_page', 20, type=int)
     category = request.args.get('category')
@@ -117,51 +159,39 @@ def get_jobs():
     lat = request.args.get('lat', type=float)
     lng = request.args.get('lng', type=float)
     max_distance = request.args.get('max_distance', type=float, default=10)
-    
-    # Build query
-    query = Job.query
-    
-    # Filters
+
+    # Use joinedload to avoid N+1 queries when fetching customer details
+    query = Job.query.options(joinedload(Job.customer))
+
     if category:
         query = query.filter_by(category=category)
-    
     if status:
         query = query.filter_by(status=status)
-    
     if city:
         query = query.filter_by(city=city)
-    
     if state:
         query = query.filter_by(state=state)
-    
-    # Filter by distance
-    if lat and lng:
+
+    if lat is not None and lng is not None:
         point = ST_SetSRID(ST_Point(lng, lat), 4326)
         query = query.filter(
-            ST_Distance(Job.location, point) <= (max_distance * 1000)
+            ST_DWithin(Job.location.cast(Geography), point.cast(Geography), max_distance * 1000)
         )
-    
-    # Order by created_at desc
-    query = query.order_by(Job.created_at.desc())
-    
-    # Paginate
-    paginated = query.paginate(page=page, per_page=per_page, error_out=False)
-    
-    jobs = []
-    for job in paginated.items:
-        customer = User.query.get(job.customer_id)
-        jobs.append({
-            'id': str(job.id),
-            'title': job.title,
-            'description': job.description[:200] + '...' if len(job.description) > 200 else job.description,
-            'category': job.category.value if job.category else None,
-            'address': job.address,
-            'estimated_price': job.estimated_price,
-            'status': job.status.value if job.status else None,
-            'customer_name': customer.full_name if customer else None,
-            'created_at': job.created_at.isoformat() if job.created_at else None
-        })
-    
+
+    paginated = query.order_by(Job.created_at.desc()).paginate(page=page, per_page=per_page, error_out=False)
+
+    jobs = [{
+        'id': str(job.id),
+        'title': job.title,
+        'description': (job.description[:200] + '...') if len(job.description or '') > 200 else job.description,
+        'category': job.category.value if job.category else None,
+        'address': job.address,
+        'estimated_price': job.estimated_price,
+        'status': job.status.value if job.status else None,
+        'customer_name': job.customer.full_name if job.customer else None,
+        'created_at': job.created_at.isoformat() if job.created_at else None
+    } for job in paginated.items]
+
     return jsonify({
         'success': True,
         'data': {
@@ -178,18 +208,15 @@ def get_jobs():
 
 @jobs_bp.route('/<job_id>', methods=['GET'])
 def get_job(job_id):
-    """Get job by ID"""
+    """Get job by ID."""
     job = Job.query.get(job_id)
-    
+
     if not job:
-        return jsonify({
-            'success': False,
-            'error': 'Job not found'
-        }), 404
-    
+        return jsonify({'success': False, 'error': 'Job not found'}), 404
+
     customer = User.query.get(job.customer_id)
     provider = User.query.get(job.provider_id) if job.provider_id else None
-    
+
     return jsonify({
         'success': True,
         'data': {
@@ -208,10 +235,9 @@ def get_job(job_id):
                 'customer': {
                     'id': str(customer.id),
                     'full_name': customer.full_name,
-                    'rating': customer.ratings_received and 
-                        sum(r.rating for r in customer.ratings_received) / len(customer.ratings_received) 
-                        if customer.ratings_received else 0
-                },
+                    'rating': (sum(r.rating for r in customer.ratings_received) / len(customer.ratings_received))
+                              if customer and customer.ratings_received else 0
+                } if customer else None,
                 'provider': {
                     'id': str(provider.id),
                     'full_name': provider.full_name,
@@ -229,52 +255,38 @@ def get_job(job_id):
 @jwt_required()
 @provider_required
 def apply_to_job(job_id):
-    """Apply to a job"""
+    """Apply to a job."""
     user = get_current_user()
     provider = user.provider
-    
+
     if not provider:
-        return jsonify({
-            'success': False,
-            'error': 'Provider profile not found'
-        }), 404
-    
+        return jsonify({'success': False, 'error': 'Provider profile not found'}), 404
+
     job = Job.query.get(job_id)
-    
     if not job:
-        return jsonify({
-            'success': False,
-            'error': 'Job not found'
-        }), 404
-    
-    # Check if can apply
+        return jsonify({'success': False, 'error': 'Job not found'}), 404
+
     can_apply, message = job.can_apply(user)
-    
     if not can_apply:
+        return jsonify({'success': False, 'error': message}), 400
+
+    provider_skills = provider.skills or []
+    if job.category and job.category.value not in provider_skills:
         return jsonify({
             'success': False,
-            'error': message
+            'error': f'You do not have required skills for this job. Required: {job.category.value}'
         }), 400
-    
-    # Check if provider has required skills
-    if job.category and job.category.value not in provider.skills:
-        return jsonify({
-            'success': False,
-            'error': f'You do not have the required skills for this job. Required: {job.category.value}'
-        }), 400
-    
-    # Assign provider to job (for now, auto-assign)
+
     job.provider_id = user.id
     job.status = JobStatus.ASSIGNED
-    
+
     db.session.commit()
-    
-    log_business_event(app, 'job_applied', {
+
+    log_business_event(current_app, 'job_applied', {
         'job_id': str(job.id),
         'provider_id': str(user.id)
     })
-    
-    # Notify customer
+
     try:
         NotificationService.send_provider_assigned_sms(
             job.customer.phone,
@@ -282,8 +294,8 @@ def apply_to_job(job_id):
             job.title
         )
     except Exception as e:
-        app.logger.error(f"Failed to send notification: {e}")
-    
+        current_app.logger.error(f"Failed to send notification: {e}")
+
     return jsonify({
         'success': True,
         'message': 'Applied to job successfully',
@@ -298,84 +310,46 @@ def apply_to_job(job_id):
 @jwt_required()
 @provider_required
 def check_in(job_id):
-    """Check in to a job (start work)"""
+    """Check in to a job."""
     user = get_current_user()
-    data = request.get_json()
-    
+    data = request.get_json() or {}
+
     job = Job.query.get(job_id)
-    
     if not job:
-        return jsonify({
-            'success': False,
-            'error': 'Job not found'
-        }), 404
-    
-    # Check if can check in
+        return jsonify({'success': False, 'error': 'Job not found'}), 404
+
     can_check_in, message = job.can_check_in(user.id)
-    
     if not can_check_in:
-        return jsonify({
-            'success': False,
-            'error': message
-        }), 400
-    
-    # Validate location
+        return jsonify({'success': False, 'error': message}), 400
+
     if not data.get('lat') or not data.get('lng'):
-        return jsonify({
-            'success': False,
-            'error': 'Location coordinates required for check-in'
-        }), 400
-    
-    # Check if provider is within 100m of job location
-    job_lat, job_lng = get_location_coords(job.location)
-    distance = calculate_distance(
-        data['lat'], data['lng'],
-        job_lat, job_lng
-    )
-    
-    if distance > 0.1:  # 100 meters
-        return jsonify({
-            'success': False,
-            'error': f'You are {distance*1000:.0f}m away from the job location. Must be within 100m.'
-        }), 400
-    
-    # Verify photo
+        return jsonify({'success': False, 'error': 'Location coordinates required for check-in'}), 400
+
+    # Geofence validation (100 meters)
+    is_valid, geo_error = validate_proximity(data['lat'], data['lng'], job.location, max_distance_km=0.1)
+    if not is_valid:
+        return jsonify({'success': False, 'error': geo_error}), 400
+
     if not data.get('photo'):
-        return jsonify({
-            'success': False,
-            'error': 'Before photo required for check-in'
-        }), 400
-    
-    # Verify OTP
-    if not data.get('otp'):
-        return jsonify({
-            'success': False,
-            'error': 'OTP required for check-in'
-        }), 400
-    
-    # Validate OTP
-    if not verify_otp(data['otp'], job.check_in_otp_hash):
-        return jsonify({
-            'success': False,
-            'error': 'Invalid OTP'
-        }), 400
-    
-    # Process check-in
+        return jsonify({'success': False, 'error': 'Before photo required for check-in'}), 400
+
+    if not data.get('otp') or not verify_otp(data['otp'], job.check_in_otp_hash):
+        return jsonify({'success': False, 'error': 'Invalid or missing OTP'}), 400
+
     job.status = JobStatus.IN_PROGRESS
     job.check_in_time = datetime.utcnow()
-    job.check_in_location = f'POINT({data["lng"]} {data["lat"]})'
+    job.check_in_location = WKTElement(f'POINT({data["lng"]} {data["lat"]})', srid=4326)
     job.check_in_photo = data['photo']
-    job.check_in_otp_hash = None  # Invalidate OTP
-    
+    job.check_in_otp_hash = None  # Invalidate consumed OTP
+
     db.session.commit()
-    
-    log_business_event(app, 'job_checked_in', {
+
+    log_business_event(current_app, 'job_checked_in', {
         'job_id': str(job.id),
         'provider_id': str(user.id),
         'location': f'{data["lat"]}, {data["lng"]}'
     })
-    
-    # Notify customer
+
     try:
         NotificationService.send_job_started_sms(
             job.customer.phone,
@@ -383,8 +357,8 @@ def check_in(job_id):
             user.full_name
         )
     except Exception as e:
-        app.logger.error(f"Failed to send notification: {e}")
-    
+        current_app.logger.error(f"Failed to send notification: {e}")
+
     return jsonify({
         'success': True,
         'message': 'Checked in successfully',
@@ -400,88 +374,47 @@ def check_in(job_id):
 @jwt_required()
 @provider_required
 def check_out(job_id):
-    """Check out of a job (complete work)"""
+    """Check out of a job."""
     user = get_current_user()
-    data = request.get_json()
-    
+    data = request.get_json() or {}
+
     job = Job.query.get(job_id)
-    
     if not job:
-        return jsonify({
-            'success': False,
-            'error': 'Job not found'
-        }), 404
-    
-    # Check if can check out
+        return jsonify({'success': False, 'error': 'Job not found'}), 404
+
     can_check_out, message = job.can_check_out(user.id)
-    
     if not can_check_out:
-        return jsonify({
-            'success': False,
-            'error': message
-        }), 400
-    
-    # Validate location
+        return jsonify({'success': False, 'error': message}), 400
+
     if not data.get('lat') or not data.get('lng'):
-        return jsonify({
-            'success': False,
-            'error': 'Location coordinates required for check-out'
-        }), 400
-    
-    # Check if provider is within 100m of job location
-    job_lat, job_lng = get_location_coords(job.location)
-    distance = calculate_distance(
-        data['lat'], data['lng'],
-        job_lat, job_lng
-    )
-    
-    if distance > 0.1:  # 100 meters
-        return jsonify({
-            'success': False,
-            'error': f'You are {distance*1000:.0f}m away from the job location. Must be within 100m.'
-        }), 400
-    
-    # Verify photo
+        return jsonify({'success': False, 'error': 'Location coordinates required for check-out'}), 400
+
+    # Geofence validation (100 meters)
+    is_valid, geo_error = validate_proximity(data['lat'], data['lng'], job.location, max_distance_km=0.1)
+    if not is_valid:
+        return jsonify({'success': False, 'error': geo_error}), 400
+
     if not data.get('photo'):
-        return jsonify({
-            'success': False,
-            'error': 'After photo required for check-out'
-        }), 400
-    
-    # Verify OTP
-    if not data.get('otp'):
-        return jsonify({
-            'success': False,
-            'error': 'OTP required for check-out'
-        }), 400
-    
-    # Validate OTP
-    if not verify_otp(data['otp'], job.check_out_otp_hash):
-        return jsonify({
-            'success': False,
-            'error': 'Invalid OTP'
-        }), 400
-    
-    # Process check-out
+        return jsonify({'success': False, 'error': 'After photo required for check-out'}), 400
+
+    if not data.get('otp') or not verify_otp(data['otp'], job.check_out_otp_hash):
+        return jsonify({'success': False, 'error': 'Invalid or missing OTP'}), 400
+
     job.status = JobStatus.COMPLETED
     job.check_out_time = datetime.utcnow()
-    job.check_out_location = f'POINT({data["lng"]} {data["lat"]})'
-    job.check_out_photo = data['photo']
-    job.check_out_otp_hash = None  # Invalidate OTP
     job.completed_at = datetime.utcnow()
-    
-    # Release payment (will be done in payment module)
-    # Payment will be released after customer confirmation
-    
+    job.check_out_location = WKTElement(f'POINT({data["lng"]} {data["lat"]})', srid=4326)
+    job.check_out_photo = data['photo']
+    job.check_out_otp_hash = None  # Invalidate consumed OTP
+
     db.session.commit()
-    
-    log_business_event(app, 'job_checked_out', {
+
+    log_business_event(current_app, 'job_checked_out', {
         'job_id': str(job.id),
         'provider_id': str(user.id),
         'location': f'{data["lat"]}, {data["lng"]}'
     })
-    
-    # Notify customer
+
     try:
         NotificationService.send_job_completed_sms(
             job.customer.phone,
@@ -489,8 +422,8 @@ def check_out(job_id):
             user.full_name
         )
     except Exception as e:
-        app.logger.error(f"Failed to send notification: {e}")
-    
+        current_app.logger.error(f"Failed to send notification: {e}")
+
     return jsonify({
         'success': True,
         'message': 'Checked out successfully. Awaiting customer confirmation.',
@@ -506,53 +439,37 @@ def check_out(job_id):
 @jwt_required()
 @customer_required
 def confirm_completion(job_id):
-    """Customer confirms job completion"""
+    """Customer confirms job completion and releases funds."""
     user = get_current_user()
-    data = request.get_json()
-    
+    data = request.get_json() or {}
+
     job = Job.query.get(job_id)
-    
     if not job:
-        return jsonify({
-            'success': False,
-            'error': 'Job not found'
-        }), 404
-    
-    # Check ownership
+        return jsonify({'success': False, 'error': 'Job not found'}), 404
+
     if str(job.customer_id) != str(user.id):
-        return jsonify({
-            'success': False,
-            'error': 'You are not authorized to confirm this job'
-        }), 403
-    
+        return jsonify({'success': False, 'error': 'You are not authorized to confirm this job'}), 403
+
     if job.status != JobStatus.COMPLETED:
-        return jsonify({
-            'success': False,
-            'error': 'Job must be completed before confirmation'
-        }), 400
-    
-    # Set final price
+        return jsonify({'success': False, 'error': 'Job must be completed before confirmation'}), 400
+
     if data.get('final_price'):
         job.final_price = data['final_price']
-    
-    db.session.commit()
-    
-    # Trigger payment release
-    from app.services.payment_service import PaymentService
+
+    # Trigger payment release inside transaction boundary
     try:
         PaymentService.release_payment(job.id)
+        db.session.commit()
     except Exception as e:
-        app.logger.error(f"Failed to release payment: {e}")
-        return jsonify({
-            'success': False,
-            'error': f'Payment release failed: {str(e)}'
-        }), 500
-    
-    log_business_event(app, 'job_confirmed', {
+        db.session.rollback()
+        current_app.logger.error(f"Failed to release payment: {e}")
+        return jsonify({'success': False, 'error': f'Payment release failed: {str(e)}'}), 500
+
+    log_business_event(current_app, 'job_confirmed', {
         'job_id': str(job.id),
         'customer_id': str(user.id)
     })
-    
+
     return jsonify({
         'success': True,
         'message': 'Job confirmed successfully. Payment has been released.',
@@ -562,39 +479,3 @@ def confirm_completion(job_id):
             'final_price': job.final_price
         }
     }), 200
-
-
-def get_nearby_providers(lat, lng, radius_km):
-    """Get providers within radius"""
-    point = ST_SetSRID(ST_Point(lng, lat), 4326)
-    providers = Provider.query.filter(
-        ST_Distance(Provider.location, point) <= (radius_km * 1000),
-        Provider.is_available == True
-    ).limit(20).all()
-    return providers
-
-
-def get_location_coords(location):
-    """Extract lat/lng from GeoAlchemy location"""
-    if not location:
-        return None, None
-    # Parse from WKT format
-    wkt = str(location)
-    if wkt.startswith('POINT('):
-        coords = wkt.replace('POINT(', '').replace(')', '').split(' ')
-        return float(coords[1]), float(coords[0])  # lat, lng
-    return None, None
-
-
-def calculate_distance(lat1, lng1, lat2, lng2):
-    """Calculate distance between two points in km"""
-    from math import radians, sin, cos, sqrt, atan2
-    R = 6371  # Earth's radius in km
-    
-    lat1, lng1, lat2, lng2 = map(radians, [lat1, lng1, lat2, lng2])
-    dlat = lat2 - lat1
-    dlng = lng2 - lng1
-    a = sin(dlat/2)**2 + cos(lat1) * cos(lat2) * sin(dlng/2)**2
-    c = 2 * atan2(sqrt(a), sqrt(1-a))
-    
-    return R * c

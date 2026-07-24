@@ -68,6 +68,9 @@ class DevelopmentConfig(Config):
     RATELIMIT_STORAGE_URL = 'memory://'
     SENTRY_DSN = ''
 
+class TestingConfig(Config):
+    TESTING = True
+    SQLALCHEMY_DATABASE_URI = 'postgresql://postgres:rushtest@127.0.0.1:5432/rushng_test_db'
 
 class ProductionConfig(Config):
     DEBUG = False
@@ -78,6 +81,7 @@ class ProductionConfig(Config):
 
 config = {
     'development': DevelopmentConfig,
+    'testing': TestingConfig,
     'production': ProductionConfig,
     'default': DevelopmentConfig
 }
