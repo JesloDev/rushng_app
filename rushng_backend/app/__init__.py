@@ -13,6 +13,7 @@ from flask_limiter.util import get_remote_address
 from flask_bcrypt import Bcrypt
 from flask_talisman import Talisman
 from flask_compress import Compress
+from sqlalchemy import text
 
 from app.core.config import config
 from app.core.database import db
@@ -35,20 +36,48 @@ def create_app(config_name=None):
     # Load configuration
     if config_name is None:
         config_name = os.getenv('FLASK_ENV', 'development')
+    
+    # Fallback if config_name isn't in dictionary
+    if config_name not in config:
+        config_name = 'default'
+        
     application.config.from_object(config[config_name])
+    
+    # Ensure Flask-Limiter finds the expected URI config key
+    if "RATELIMIT_STORAGE_URI" not in application.config:
+        application.config["RATELIMIT_STORAGE_URI"] = application.config.get(
+            "RATELIMIT_STORAGE_URL", "memory://"
+        )
     
     # Setup logging
     setup_logging(application)
     
-    # Initialize extensions
+    # 1. Initialize DB & Migrations
     db.init_app(application)
-    jwt.init_app(application)
     migrate.init_app(application, db)
+    
+    # 2. Auth & Security
     bcrypt.init_app(application)
+    jwt.init_app(application)
+    
+    # 3. Rate Limiting (Flask-Limiter reads RATELIMIT_STORAGE_URI from application.config)
     limiter.init_app(application)
-    talisman.init_app(application)
+    
+    # 4. Security Headers (Only enforce when TALISMAN_ENABLED is True)
+    if application.config.get('TALISMAN_ENABLED', False):
+        talisman.init_app(
+            application,
+            content_security_policy=None,  # Allow REST API responses without strict HTML CSP
+            force_https=True
+        )
+        
+    # 5. Compression & CORS
     compress.init_app(application)
-    cors.init_app(application, origins=application.config.get('CORS_ORIGINS', ['*']))
+    cors.init_app(
+        application, 
+        origins=application.config.get('CORS_ORIGINS', ['*']),
+        supports_credentials=True
+    )
     
     # Register models so Alembic/Flask-Migrate detects metadata changes
     try:
@@ -103,7 +132,7 @@ def create_app(config_name=None):
     @application.route('/api/health')
     def health_check():
         try:
-            db.session.execute('SELECT 1')
+            db.session.execute(text('SELECT 1'))
             db_status = 'healthy'
         except Exception as e:
             db_status = f'unhealthy: {str(e)}'
@@ -128,6 +157,10 @@ def create_app(config_name=None):
     @application.errorhandler(404)
     def not_found(error):
         return jsonify({'error': 'Resource not found'}), 404
+    
+    @application.errorhandler(429)
+    def ratelimit_handler(e):
+        return jsonify({'error': 'Rate limit exceeded', 'details': str(e.description)}), 429
     
     @application.errorhandler(500)
     def internal_error(error):

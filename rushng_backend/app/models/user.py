@@ -1,5 +1,5 @@
 from sqlalchemy.dialects.postgresql import UUID
-from sqlalchemy import Column, String, Boolean, DateTime, Text, Enum
+from sqlalchemy import Column, String, Boolean, DateTime, Text, Enum, Index
 from datetime import datetime, timezone
 import uuid
 import enum
@@ -8,14 +8,13 @@ from app.core.database import db
 
 
 class UserRole(str, enum.Enum):
-    CUSTOMER = "customer"
-    PROVIDER = "provider"
-    ADMIN = "admin"
-    SUPPORT = "support"
+    CUSTOMER = "CUSTOMER"
+    PROVIDER = "PROVIDER"
+    ADMIN = "ADMIN"
+    SUPPORT = "SUPPORT"
 
     @classmethod
     def _missing_(cls, value):
-        # Handles case-insensitive lookups (e.g., UserRole("CUSTOMER") -> UserRole.CUSTOMER)
         if isinstance(value, str):
             value = value.lower()
             for member in cls:
@@ -27,13 +26,18 @@ class UserRole(str, enum.Enum):
 class User(db.Model):
     __tablename__ = 'users'
     
+    __table_args__ = (
+        # Partial unique indexes: allow re-registering emails/phones if account was soft-deleted
+        Index('uix_users_active_email', 'email', unique=True, postgresql_where=(Column('deleted_at').is_(None))),
+        Index('uix_users_active_phone', 'phone', unique=True, postgresql_where=(Column('deleted_at').is_(None))),
+    )
+    
     id = Column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
-    email = Column(String(255), unique=True, nullable=False, index=True)
-    phone = Column(String(20), unique=True, nullable=False, index=True)
+    email = Column(String(255), nullable=False)
+    phone = Column(String(20), nullable=False)
     password_hash = Column(String(255), nullable=False)
     full_name = Column(String(255), nullable=False)
     
-    # Instruct SQLAlchemy to send lowercase enum values ("customer") to PostgreSQL
     role = Column(
         Enum(
             UserRole,
@@ -94,7 +98,6 @@ class User(db.Model):
     refresh_tokens = db.relationship('RefreshToken', back_populates='user', lazy='dynamic')
     
     def __init__(self, **kwargs):
-        # Gracefully handle string-to-Enum conversion upon initialization
         if 'role' in kwargs and isinstance(kwargs['role'], str):
             kwargs['role'] = UserRole(kwargs['role'])
         super(User, self).__init__(**kwargs)
@@ -102,38 +105,8 @@ class User(db.Model):
     def __repr__(self):
         return f'<User {self.email}>'
     
-    def get_full_name(self):
-        return self.full_name
-    
     def is_provider(self):
         return self.role == UserRole.PROVIDER or self.is_verified_provider
-    
-    def can_delete_account(self):
-        from app.models.job import Job, JobStatus
-        from app.models.violation import Violation
-        from datetime import timedelta
-        
-        # Check for active jobs
-        active_jobs = Job.query.filter(
-            (Job.customer_id == self.id) | (Job.provider_id == self.id),
-            Job.status.in_([JobStatus.ASSIGNED, JobStatus.IN_PROGRESS])
-        ).count()
-        
-        if active_jobs > 0:
-            return False, "You have active jobs. Complete them first."
-        
-        # Check for recent violations (last 90 days)
-        cutoff_date = datetime.now(timezone.utc) - timedelta(days=90)
-        recent_violations = Violation.query.filter(
-            Violation.user_id == self.id,
-            Violation.status == 'confirmed',
-            Violation.created_at > cutoff_date
-        ).count()
-        
-        if recent_violations > 0:
-            return False, f"You have {recent_violations} recent violations."
-        
-        return True, "Account eligible for deletion"
     
     def to_dict(self, include_sensitive=False):
         data = {

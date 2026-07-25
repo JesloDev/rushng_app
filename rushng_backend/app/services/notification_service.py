@@ -1,8 +1,35 @@
+import re
 import requests
 import json
 from flask import current_app
 import brevo_python
 from brevo_python.rest import ApiException
+
+def format_phone_e164(phone: str, default_country_code: str = "234") -> str:
+    """
+    Ensures a phone number is formatted strictly to E.164 standard required by Brevo.
+    Examples:
+      '07045787903'   -> '+2347045787903'
+      '2347045787903'  -> '+2347045787903'
+      '+2347045787903' -> '+2347045787903'
+    """
+    if not phone:
+        return ""
+        
+    # Strip spaces, hyphens, and parenthetical symbols
+    cleaned = re.sub(r'[\s\-\(\)]', '', str(phone).strip())
+
+    if cleaned.startswith('+'):
+        return cleaned
+
+    if cleaned.startswith('0'):
+        return f"+{default_country_code}{cleaned[1:]}"
+
+    if cleaned.startswith(default_country_code):
+        return f"+{cleaned}"
+
+    return f"+{default_country_code}{cleaned}"
+
 
 class NotificationService:
     """Handle notifications via Brevo (SMS + Email)"""
@@ -11,15 +38,14 @@ class NotificationService:
     def send_sms(phone, message):
         """Send SMS via Brevo"""
         try:
-            # Remove '+' if present and ensure Nigerian format
-            phone = phone.replace('+', '')
+            # Format phone to proper E.164 (e.g. +2347045787903)
+            formatted_phone = format_phone_e164(phone)
             
-            # Brevo SMS API
             url = "https://api.brevo.com/v3/transactionalSMS/sms"
             
             payload = {
                 "sender": current_app.config.get('BREVO_SMS_SENDER', 'RUSHNG'),
-                "recipient": phone,
+                "recipient": formatted_phone,
                 "content": message,
                 "type": "transactional",
                 "tag": "notification"
@@ -33,8 +59,8 @@ class NotificationService:
             
             response = requests.post(url, json=payload, headers=headers, timeout=10)
             
-            if response.status_code == 200 or response.status_code == 201:
-                current_app.logger.info(f"SMS sent to {phone}: {message[:50]}...")
+            if response.status_code in (200, 201):
+                current_app.logger.info(f"SMS sent to {formatted_phone}: {message[:50]}...")
                 return {'success': True}
             else:
                 current_app.logger.error(f"Brevo SMS error: {response.text}")
@@ -84,7 +110,7 @@ class NotificationService:
         except Exception as e:
             current_app.logger.error(f"Email sending failed: {e}")
             return {'success': False, 'error': str(e)}
-    
+
     # ==================== TEMPLATED NOTIFICATIONS ====================
     
     @staticmethod

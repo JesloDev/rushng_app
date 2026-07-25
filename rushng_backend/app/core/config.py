@@ -23,13 +23,14 @@ class Config:
     # CORS
     CORS_ORIGINS = os.getenv('CORS_ORIGINS', 'http://localhost:3000,http://127.0.0.1:3000').split(',')
     
-    # Rate Limiting
+    # Rate Limiting (Flask-Limiter uses RATELIMIT_STORAGE_URI)
     RATELIMIT_DEFAULT = os.getenv('RATELIMIT_DEFAULT', '1000 per minute')
     RATELIMIT_AUTH = os.getenv('RATELIMIT_AUTH', '100 per minute')
     RATELIMIT_JOB_POST = os.getenv('RATELIMIT_JOB_POST', '100 per hour')
-    RATELIMIT_STORAGE_URL = os.getenv('REDIS_URL', 'memory://')
+    RATELIMIT_STORAGE_URI = os.getenv('REDIS_URL', 'memory://')
+    RATELIMIT_STORAGE_URL = RATELIMIT_STORAGE_URI
     
-    # Sentry (Optional - set in .env if needed)
+    # Sentry
     SENTRY_DSN = os.getenv('SENTRY_DSN', '')
     
     # Payments
@@ -65,18 +66,24 @@ class DevelopmentConfig(Config):
     DEBUG = True
     ENVIRONMENT = 'development'
     TALISMAN_ENABLED = False
+    RATELIMIT_STORAGE_URI = 'memory://'
     RATELIMIT_STORAGE_URL = 'memory://'
     SENTRY_DSN = ''
+
 
 class TestingConfig(Config):
     TESTING = True
     SQLALCHEMY_DATABASE_URI = 'postgresql://postgres:rushtest@127.0.0.1:5432/rushng_test_db'
+    RATELIMIT_STORAGE_URI = 'memory://'
+    RATELIMIT_STORAGE_URL = 'memory://'
+
 
 class ProductionConfig(Config):
     DEBUG = False
     ENVIRONMENT = 'production'
     TALISMAN_ENABLED = True
-    RATELIMIT_STORAGE_URL = os.getenv('REDIS_URL', 'redis://localhost:6379/0')
+    RATELIMIT_STORAGE_URI = os.getenv('REDIS_URL', 'redis://localhost:6379/0')
+    RATELIMIT_STORAGE_URL = RATELIMIT_STORAGE_URI
 
 
 config = {

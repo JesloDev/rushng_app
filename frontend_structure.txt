@@ -2,6 +2,7 @@ rushng-frontend/
 │
 ├── 📁 app/
 │   ├── 📁 (auth)/
+│   │   ├── 📄 layout.tsx
 │   │   ├── 📁 login/
 │   │   │   └── 📄 page.tsx
 │   │   ├── 📁 register/
@@ -12,52 +13,58 @@ rushng-frontend/
 │   │       └── 📄 page.tsx
 │   │
 │   ├── 📁 (dashboard)/
+│   │   ├── 📄 layout.tsx
 │   │   ├── 📁 customer/
-│   │   │   ├── 📄 page.tsx
-│   │   │   ├── 📁 jobs/
-│   │   │   │   ├── 📄 page.tsx
-│   │   │   │   └── 📄 [id].tsx
-│   │   │   └── 📁 profile/
-│   │   │       └── 📄 page.tsx
+│   │   │   └── 📄 page.tsx
 │   │   ├── 📁 provider/
-│   │   │   ├── 📄 page.tsx
-│   │   │   ├── 📁 jobs/
-│   │   │   │   ├── 📄 page.tsx
-│   │   │   │   └── 📄 [id].tsx
-│   │   │   ├── 📁 earnings/
-│   │   │   │   └── 📄 page.tsx
-│   │   │   └── 📁 profile/
-│   │   │       └── 📄 page.tsx
+│   │   │   └── 📄 page.tsx
 │   │   └── 📁 admin/
-│   │       ├── 📄 page.tsx
-│   │       ├── 📁 users/
-│   │       │   └── 📄 page.tsx
-│   │       ├── 📁 jobs/
-│   │       │   └── 📄 page.tsx
-│   │       └── 📁 violations/
-│   │           └── 📄 page.tsx
+│   │       └── 📄 page.tsx
+│   │
+│   ├── 📁 dashboard/
+│   │   └── 📄 page.tsx
 │   │
 │   ├── 📁 jobs/
 │   │   ├── 📄 page.tsx
+│   │   ├── 📄 loading.tsx
 │   │   ├── 📁 post/
+│   │   │   └── 📄 page.tsx
+│   │   ├── 📁 my/
 │   │   │   └── 📄 page.tsx
 │   │   └── 📁 [id]/
 │   │       ├── 📄 page.tsx
+│	│       ├── 📁 payment/
+│	│       │   └── 📄 page.tsx
 │   │       └── 📁 track/
 │   │           └── 📄 page.tsx
 │   │
+│   ├── 📁 notifications/
+│   │   └── 📄 page.tsx
+│   │
 │   ├── 📁 providers/
 │   │   ├── 📄 page.tsx
+│   │   ├── 📁 me/
+│   │   │   └── 📄 page.tsx
 │   │   ├── 📁 register/
 │   │   │   └── 📄 page.tsx
 │   │   └── 📁 [id]/
 │   │       └── 📄 page.tsx
 │   │
 │   ├── 📁 payments/
+│   │   ├── 📄 page.tsx
+│   │   ├── 📁 [id]/
+│   │   │   └── 📄 page.tsx
 │   │   └── 📁 verify/
 │   │       └── 📄 page.tsx
 │   │
+│   ├── 📁 profile/
+│   │   └── 📄 page.tsx
+│   │
+│   ├── 📁 settings/
+│   │   └── 📄 page.tsx
+│   │
 │   ├── 📄 layout.tsx
+│   ├── 📄 loading.tsx
 │   ├── 📄 page.tsx
 │   └── 📄 globals.css
 │
@@ -90,25 +97,26 @@ rushng-frontend/
 │   │   ├── 📄 LoginForm.tsx
 │   │   ├── 📄 RegisterForm.tsx
 │   │   ├── 📄 VerifyForm.tsx
-│   │   └── 📄 ResetPasswordForm.tsx
+│   │   └── 📄 ResetPasswordForm.tsx		**missing
 │   │
 │   ├── 📁 jobs/
 │   │   ├── 📄 JobCard.tsx
 │   │   ├── 📄 JobList.tsx
 │   │   ├── 📄 JobDetails.tsx
 │   │   ├── 📄 JobPostForm.tsx
-│   │   ├── 📄 JobTracking.tsx
-│   │   ├── 📄 JobBids.tsx
+│   │   ├── 📄 JobTracking.tsx				**missing
+│   │   ├── 📄 JobBids.tsx					**missing
 │   │   ├── 📄 JobFilters.tsx
-│   │   ├── 📄 CheckIn.tsx
-│   │   └── 📄 CheckOut.tsx
+│   │   ├── 📄 CheckIn.tsx					**missing
+│   │   └── 📄 CheckOut.tsx					**missing
 │   │
 │   ├── 📁 providers/
+│   │   ├── 📄 Providers.tsx
 │   │   ├── 📄 ProviderCard.tsx
 │   │   ├── 📄 ProviderList.tsx
 │   │   ├── 📄 ProviderProfile.tsx
-│   │   ├── 📄 ProviderRegistration.tsx
-│   │   ├── 📄 ProviderVerification.tsx
+│   │   ├── 📄 ProviderRegistration.tsx		**missing
+│   │   ├── 📄 ProviderVerification.tsx		**missing
 │   │   └── 📄 ProviderSearch.tsx
 │   │
 │   ├── 📁 payments/
@@ -121,13 +129,17 @@ rushng-frontend/
 │   │   └── 📄 ViolationCard.tsx
 │   │
 │   ├── 📁 dashboard/
-│   │   ├── 📄 CustomerDashboard.tsx
-│   │   ├── 📄 ProviderDashboard.tsx
-│   │   ├── 📄 AdminDashboard.tsx
+│   │   ├── 📄 CustomerDashboard.tsx		**missing
+│   │   ├── 📄 ProviderDashboard.tsx		**missing
+│   │   ├── 📄 AdminDashboard.tsx			**missing
 │   │   ├── 📄 StatsCard.tsx
 │   │   └── 📄 ChartWidget.tsx
 │   │
 │   ├── 📁 shared/
+│   │   ├── 📄 GlobalLoadingOverlay.tsx
+│   │   ├── 📄 Pagination.tsx
+│   │   ├── 📄 SearchBar.tsx
+│   │   ├── 📄 StatusBadge.tsx
 │   │   ├── 📄 LocationPicker.tsx
 │   │   ├── 📄 ImageUploader.tsx
 │   │   ├── 📄 RatingStars.tsx
@@ -164,17 +176,10 @@ rushng-frontend/
 │   └── 📄 index.ts                   # TypeScript types
 │
 ├── 📁 public/
-│   ├── 📁 images/
-│   │   ├── 📄 logo.png
-│   │   ├── 📄 favicon.ico
-│   │   └── 📄 hero-bg.jpg
-│   └── 📄 robots.txt
 │
 ├── 📁 styles/
-│   └── 📄 globals.css
 │
 ├── 📄 .env.local
-├── 📄 .env.local.example
 ├── 📄 .gitignore
 ├── 📄 package.json
 ├── 📄 package-lock.json
@@ -183,6 +188,5 @@ rushng-frontend/
 ├── 📄 tailwind.config.js
 ├── 📄 postcss.config.js
 ├── 📄 components.json                # shadcn/ui config
-├── 📄 middleware.ts                  # Next.js middleware (auth)	[removed]
 ├── 📄 next-env.d.ts												...
 └── 📄 README.md													...

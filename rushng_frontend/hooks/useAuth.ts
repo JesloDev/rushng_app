@@ -5,7 +5,6 @@ import { useRouter } from 'next/navigation';
 import { authApi } from '@/lib/api';
 import { useAppStore } from '@/store/app-store';
 import { toast } from 'sonner';
-import type { User } from '@/lib/api';
 
 interface AuthError {
   field?: string;
@@ -15,7 +14,7 @@ interface AuthError {
 
 export function useAuth() {
   const router = useRouter();
-  const { user, setUser, isAuthenticated, setAuth, logout: storeLogout } = useAppStore();
+  const { setUser, setAuth, logout: storeLogout, user, isAuthenticated } = useAppStore();
   const [loading, setLoading] = useState(true);
   const [loginLoading, setLoginLoading] = useState(false);
   const [registerLoading, setRegisterLoading] = useState(false);
@@ -27,8 +26,10 @@ export function useAuth() {
       if (token) {
         try {
           const response = await authApi.me();
-          if (response.data.success) {
-            setUser(response.data.data.user);
+          if (response.data?.success) {
+            // Unpacks both response.data.data.user and response.data.data safely
+            const userData = response.data.data?.user || response.data.data;
+            setUser(userData);
             setAuth(true);
           } else {
             localStorage.clear();
@@ -73,8 +74,8 @@ export function useAuth() {
 
       const response = await authApi.login({ email, password });
 
-      if (response.data.success) {
-        const userData = response.data.data.user;
+      if (response.data?.success) {
+        const userData = response.data.data?.user || response.data.data;
         const tokens = {
           access_token: response.data.data.access_token,
           refresh_token: response.data.data.refresh_token,
@@ -83,11 +84,11 @@ export function useAuth() {
         localStorage.setItem('refresh_token', tokens.refresh_token);
         setUser(userData);
         setAuth(true);
-        toast.success(`Welcome back, ${userData.full_name}!`);
+        toast.success(`Welcome back, ${userData.full_name || 'User'}!`);
         setLoginLoading(false);
         return true;
       } else {
-        const errorMsg = response.data.message || 'Login failed. Please check your credentials.';
+        const errorMsg = response.data?.message || 'Login failed. Please check your credentials.';
         setError({ message: errorMsg });
         toast.error('Login failed', { description: errorMsg });
         setLoginLoading(false);
@@ -146,12 +147,12 @@ export function useAuth() {
 
       const response = await authApi.register(userData);
 
-      if (response.data.success) {
-        toast.success(`Welcome to RUSHNG! Please verify your email.`);
+      if (response.data?.success) {
+        toast.success('Welcome to RUSHNG! Please verify your email.');
         setRegisterLoading(false);
         return true;
       } else {
-        const errorMsg = response.data.message || 'Registration failed. Please try again.';
+        const errorMsg = response.data?.message || 'Registration failed. Please try again.';
         setError({ message: errorMsg });
         toast.error('Registration failed', { description: errorMsg });
         setRegisterLoading(false);
@@ -169,11 +170,11 @@ export function useAuth() {
   const verify = async (email: string, code: string) => {
     try {
       const response = await authApi.verify({ email, code });
-      if (response.data.success) {
+      if (response.data?.success) {
         toast.success('Account verified successfully!');
         return true;
       }
-      toast.error(response.data.message || 'Verification failed');
+      toast.error(response.data?.message || 'Verification failed');
       return false;
     } catch (error: any) {
       toast.error(error.response?.data?.error || 'Verification failed');
@@ -198,12 +199,13 @@ export function useAuth() {
   const updateProfile = async (data: any) => {
     try {
       const response = await authApi.updateProfile(data);
-      if (response.data.success) {
-        setUser(response.data.data.user);
+      if (response.data?.success) {
+        const userData = response.data.data?.user || response.data.data;
+        setUser(userData);
         toast.success('Profile updated successfully!');
         return true;
       }
-      toast.error(response.data.message || 'Failed to update profile');
+      toast.error(response.data?.message || 'Failed to update profile');
       return false;
     } catch (error: any) {
       toast.error(error.response?.data?.error || 'Failed to update profile');
@@ -214,11 +216,11 @@ export function useAuth() {
   const changePassword = async (current_password: string, new_password: string) => {
     try {
       const response = await authApi.changePassword({ current_password, new_password });
-      if (response.data.success) {
+      if (response.data?.success) {
         toast.success('Password changed successfully!');
         return true;
       }
-      toast.error(response.data.message || 'Failed to change password');
+      toast.error(response.data?.message || 'Failed to change password');
       return false;
     } catch (error: any) {
       toast.error(error.response?.data?.error || 'Failed to change password');
@@ -229,12 +231,12 @@ export function useAuth() {
   const deleteAccount = async () => {
     try {
       const response = await authApi.deleteAccount();
-      if (response.data.success) {
+      if (response.data?.success) {
         toast.success('Account deleted successfully');
         await logout();
         return true;
       }
-      toast.error(response.data.message || 'Failed to delete account');
+      toast.error(response.data?.message || 'Failed to delete account');
       return false;
     } catch (error: any) {
       toast.error(error.response?.data?.error || 'Failed to delete account');

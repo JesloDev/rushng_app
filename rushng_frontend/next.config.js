@@ -1,6 +1,9 @@
 /** @type {import('next').NextConfig} */
+const rawApiUrl = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000';
+const cleanBackendHost = rawApiUrl.replace(/\/api\/?$/, '');
+
 const nextConfig = {
-  // ✅ Fixed: Using remotePatterns instead of deprecated domains
+  // Remote patterns for images
   images: {
     remotePatterns: [
       {
@@ -42,31 +45,26 @@ const nextConfig = {
     ],
   },
 
-  // ✅ Experimental features
+  // Experimental features
   experimental: {
     optimizePackageImports: ['lucide-react', 'date-fns', 'framer-motion'],
   },
 
-  // ✅ Turbopack configuration (silences warning)
-  turbopack: {
-    // Empty config is fine - just having it silences the warning
-  },
+  // Turbopack configuration
+  turbopack: {},
 
-  // ✅ API rewrites (proxy to backend)
+  // API rewrites (proxy to backend without duplicating /api)
   async rewrites() {
     return [
       {
         source: '/api/:path*',
-        destination: process.env.NEXT_PUBLIC_API_URL
-          ? `${process.env.NEXT_PUBLIC_API_URL}/api/:path*`
-          : 'http://localhost:8000/api/:path*',
+        destination: `${cleanBackendHost}/api/:path*`,
       },
     ];
   },
 
-  // ✅ Webpack fallback (for compatibility)
+  // Webpack fallback
   webpack: (config, { isServer }) => {
-    // Fix for packages that need polyfills
     if (!isServer) {
       config.resolve.fallback = {
         ...config.resolve.fallback,
@@ -79,25 +77,15 @@ const nextConfig = {
     return config;
   },
 
-  // ✅ Compiler options
+  // Compiler options
   compiler: {
-    // Remove console.log in production
     removeConsole: process.env.NODE_ENV === 'production',
   },
 
-  // ✅ Powered by header (optional)
   poweredByHeader: false,
-
-  // ✅ React strict mode
   reactStrictMode: true,
-
-  // ✅ Compression
   compress: true,
-
-  // ✅ Production source maps
   productionBrowserSourceMaps: false,
-
-  // ✅ SWC minification
   swcMinify: true,
 };
 
