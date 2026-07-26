@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useCallback } from 'react';
 import { useParams, useRouter } from 'next/navigation';
 import Link from 'next/link';
 import { paymentApi } from '@/lib/api';
@@ -10,10 +10,8 @@ import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { Skeleton } from '@/components/ui/skeleton';
 import { Separator } from '@/components/ui/separator';
-import { 
+import {
   ArrowLeft,
-  DollarSign,
-  Calendar,
   Clock,
   CheckCircle2,
   XCircle,
@@ -24,8 +22,11 @@ import {
   Copy,
   Check,
   Download,
+  ArrowUpRight,
+  AlertCircle,
+  Loader2,
 } from 'lucide-react';
-import { format } from 'date-fns';
+import { format, isValid } from 'date-fns';
 import { toast } from 'sonner';
 
 interface Payment {
@@ -37,19 +38,19 @@ interface Payment {
   provider: string;
   reference: string;
   created_at: string;
-  held_at: string;
-  released_at: string;
-  job: {
+  held_at?: string;
+  released_at?: string;
+  job?: {
     id: string;
     title: string;
     description: string;
   };
-  customer: {
+  customer?: {
     id: string;
     full_name: string;
     email: string;
   };
-  provider_user: {
+  provider_user?: {
     id: string;
     full_name: string;
     email: string;
@@ -65,17 +66,12 @@ export default function PaymentDetailsPage() {
   const [payment, setPayment] = useState<Payment | null>(null);
   const [loading, setLoading] = useState(true);
   const [copied, setCopied] = useState(false);
+  const [actionLoading, setActionLoading] = useState(false);
 
-  useEffect(() => {
-    if (isAuthenticated) {
-      fetchPayment();
-    }
-  }, [paymentId, isAuthenticated]);
-
-  const fetchPayment = async () => {
+  const fetchPayment = useCallback(async () => {
     try {
       const response = await paymentApi.get(paymentId);
-      if (response.data.success) {
+      if (response.data?.success) {
         setPayment(response.data.data);
       }
     } catch (error) {
@@ -83,10 +79,16 @@ export default function PaymentDetailsPage() {
     } finally {
       setLoading(false);
     }
-  };
+  }, [paymentId]);
+
+  useEffect(() => {
+    if (isAuthenticated && paymentId) {
+      fetchPayment();
+    }
+  }, [paymentId, isAuthenticated, fetchPayment]);
 
   const handleCopyReference = () => {
-    if (payment) {
+    if (payment?.reference) {
       navigator.clipboard.writeText(payment.reference);
       setCopied(true);
       setTimeout(() => setCopied(false), 2000);
@@ -94,37 +96,51 @@ export default function PaymentDetailsPage() {
     }
   };
 
+  const handleReleasePayment = async () => {
+    if (!payment) return;
+    setActionLoading(true);
+    try {
+      await paymentApi.release(payment.id);
+      toast.success('Payment released from escrow');
+      fetchPayment();
+    } catch (error) {
+      toast.error('Failed to release payment');
+    } finally {
+      setActionLoading(false);
+    }
+  };
+
   const getStatusConfig = (status: string) => {
     const configs: Record<string, { label: string; color: string; icon: React.ReactNode }> = {
-      pending: { 
-        label: 'Pending', 
-        color: 'text-yellow-600 bg-yellow-50',
-        icon: <Clock className="h-5 w-5" />
+      pending: {
+        label: 'Pending',
+        color: 'text-yellow-600 bg-yellow-50 dark:bg-yellow-950/30',
+        icon: <Clock className="h-5 w-5" />,
       },
-      held: { 
-        label: 'Held in Escrow', 
-        color: 'text-blue-600 bg-blue-50',
-        icon: <Clock className="h-5 w-5" />
+      held: {
+        label: 'Held in Escrow',
+        color: 'text-blue-600 bg-blue-50 dark:bg-blue-950/30',
+        icon: <Clock className="h-5 w-5" />,
       },
-      released: { 
-        label: 'Released', 
-        color: 'text-green-600 bg-green-50',
-        icon: <CheckCircle2 className="h-5 w-5" />
+      released: {
+        label: 'Released',
+        color: 'text-green-600 bg-green-50 dark:bg-green-950/30',
+        icon: <CheckCircle2 className="h-5 w-5" />,
       },
-      refunded: { 
-        label: 'Refunded', 
-        color: 'text-purple-600 bg-purple-50',
-        icon: <ArrowUpRight className="h-5 w-5" />
+      refunded: {
+        label: 'Refunded',
+        color: 'text-purple-600 bg-purple-50 dark:bg-purple-950/30',
+        icon: <ArrowUpRight className="h-5 w-5" />,
       },
-      failed: { 
-        label: 'Failed', 
-        color: 'text-red-600 bg-red-50',
-        icon: <XCircle className="h-5 w-5" />
+      failed: {
+        label: 'Failed',
+        color: 'text-red-600 bg-red-50 dark:bg-red-950/30',
+        icon: <XCircle className="h-5 w-5" />,
       },
-      disputed: { 
-        label: 'Disputed', 
-        color: 'text-orange-600 bg-orange-50',
-        icon: <AlertCircle className="h-5 w-5" />
+      disputed: {
+        label: 'Disputed',
+        color: 'text-orange-600 bg-orange-50 dark:bg-orange-950/30',
+        icon: <AlertCircle className="h-5 w-5" />,
       },
     };
     return configs[status] || { label: status, color: 'text-gray-600 bg-gray-50', icon: null };
@@ -132,27 +148,37 @@ export default function PaymentDetailsPage() {
 
   const getProviderInfo = (provider: string) => {
     const providers: Record<string, { name: string; icon: React.ReactNode }> = {
-      opay: { 
-        name: 'OPay', 
-        icon: <Smartphone className="h-6 w-6" />
+      opay: {
+        name: 'OPay',
+        icon: <Smartphone className="h-5 w-5 text-green-500" />,
       },
-      paystack: { 
-        name: 'Paystack', 
-        icon: <CreditCard className="h-6 w-6" />
+      paystack: {
+        name: 'Paystack',
+        icon: <CreditCard className="h-5 w-5 text-blue-500" />,
       },
-      flutterwave: { 
-        name: 'Flutterwave', 
-        icon: <Building2 className="h-6 w-6" />
+      flutterwave: {
+        name: 'Flutterwave',
+        icon: <Building2 className="h-5 w-5 text-yellow-500" />,
       },
     };
-    return providers[provider] || { name: provider, icon: <Wallet className="h-6 w-6" /> };
+    return providers[provider.toLowerCase()] || { name: provider, icon: <Wallet className="h-5 w-5" /> };
+  };
+
+  const safeFormat = (dateStr?: string) => {
+    if (!dateStr) return 'N/A';
+    const date = new Date(dateStr);
+    return isValid(date) ? format(date, 'MMM d, yyyy HH:mm') : 'Invalid Date';
   };
 
   if (loading) {
     return (
-      <div className="space-y-6">
-        <Skeleton className="h-12 w-48" />
-        <Skeleton className="h-64" />
+      <div className="space-y-6 max-w-3xl mx-auto">
+        <Skeleton className="h-10 w-48" />
+        <Skeleton className="h-32 w-full rounded-xl" />
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+          <Skeleton className="h-48 w-full rounded-xl" />
+          <Skeleton className="h-48 w-full rounded-xl" />
+        </div>
       </div>
     );
   }
@@ -160,9 +186,9 @@ export default function PaymentDetailsPage() {
   if (!payment) {
     return (
       <div className="text-center py-12">
-        <Wallet className="h-12 w-12 text-gray-300 mx-auto mb-4" />
-        <p className="text-muted-foreground">Payment not found</p>
-        <Button variant="link" onClick={() => router.back()}>
+        <Wallet className="h-12 w-12 text-muted-foreground mx-auto mb-4" />
+        <p className="text-muted-foreground">Payment details not found</p>
+        <Button variant="link" onClick={() => router.back()} className="mt-2">
           Go Back
         </Button>
       </div>
@@ -176,18 +202,18 @@ export default function PaymentDetailsPage() {
     <div className="space-y-6 max-w-3xl mx-auto">
       {/* Header */}
       <div className="flex items-center justify-between">
-        <div className="flex items-center gap-4">
+        <div className="flex items-center gap-3">
           <Button variant="ghost" size="icon" onClick={() => router.back()}>
             <ArrowLeft className="h-5 w-5" />
           </Button>
           <div>
             <h1 className="text-2xl font-bold">Payment Details</h1>
-            <p className="text-sm text-muted-foreground">
-              Transaction reference: {payment.reference}
+            <p className="text-xs md:text-sm text-muted-foreground font-mono">
+              Ref: {payment.reference}
             </p>
           </div>
         </div>
-        <Button variant="outline" className="gap-2">
+        <Button variant="outline" className="gap-2 text-xs md:text-sm">
           <Download className="h-4 w-4" />
           Receipt
         </Button>
@@ -202,14 +228,14 @@ export default function PaymentDetailsPage() {
                 {statusConfig.icon}
               </div>
               <div>
-                <p className="text-sm text-muted-foreground">Status</p>
+                <p className="text-xs text-muted-foreground">Status</p>
                 <p className="text-lg font-semibold">{statusConfig.label}</p>
               </div>
             </div>
             <div className="text-right">
-              <p className="text-sm text-muted-foreground">Amount</p>
-              <p className="text-3xl font-bold text-orange-500">
-                ₦{payment.amount.toLocaleString()}
+              <p className="text-xs text-muted-foreground">Amount</p>
+              <p className="text-2xl md:text-3xl font-bold text-orange-500">
+                ₦{payment.amount?.toLocaleString()}
               </p>
             </div>
           </div>
@@ -220,42 +246,43 @@ export default function PaymentDetailsPage() {
       <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
         <Card>
           <CardContent className="p-6 space-y-4">
-            <h3 className="font-semibold">Payment Information</h3>
+            <h3 className="font-semibold text-sm md:text-base">Payment Breakout</h3>
             <Separator />
-            <div className="space-y-3">
-              <div className="flex justify-between">
+            <div className="space-y-3 text-sm">
+              <div className="flex justify-between items-center">
                 <span className="text-muted-foreground">Provider</span>
                 <span className="flex items-center gap-2 font-medium">
                   {providerInfo.icon}
                   {providerInfo.name}
                 </span>
               </div>
-              <div className="flex justify-between">
+              <div className="flex justify-between items-center">
                 <span className="text-muted-foreground">Reference</span>
-                <div className="flex items-center gap-2">
-                  <span className="font-mono text-sm">{payment.reference}</span>
+                <div className="flex items-center gap-1.5">
+                  <span className="font-mono text-xs">{payment.reference}</span>
                   <Button
                     variant="ghost"
                     size="icon"
                     className="h-6 w-6"
                     onClick={handleCopyReference}
                   >
-                    {copied ? <Check className="h-3 w-3" /> : <Copy className="h-3 w-3" />}
+                    {copied ? <Check className="h-3 w-3 text-green-500" /> : <Copy className="h-3 w-3" />}
                   </Button>
                 </div>
               </div>
               <div className="flex justify-between">
-                <span className="text-muted-foreground">Amount</span>
-                <span className="font-medium">₦{payment.amount.toLocaleString()}</span>
+                <span className="text-muted-foreground">Subtotal</span>
+                <span className="font-medium">₦{payment.amount?.toLocaleString()}</span>
               </div>
               <div className="flex justify-between">
                 <span className="text-muted-foreground">Platform Fee</span>
-                <span className="font-medium">₦{payment.platform_fee.toLocaleString()}</span>
+                <span className="font-medium">₦{payment.platform_fee?.toLocaleString()}</span>
               </div>
+              <Separator className="my-1" />
               <div className="flex justify-between">
-                <span className="text-muted-foreground">Provider Earnings</span>
-                <span className="font-medium text-green-600">
-                  ₦{payment.provider_earnings.toLocaleString()}
+                <span className="text-muted-foreground">Provider Net</span>
+                <span className="font-semibold text-green-600 dark:text-green-400">
+                  ₦{payment.provider_earnings?.toLocaleString()}
                 </span>
               </div>
             </div>
@@ -264,28 +291,24 @@ export default function PaymentDetailsPage() {
 
         <Card>
           <CardContent className="p-6 space-y-4">
-            <h3 className="font-semibold">Timeline</h3>
+            <h3 className="font-semibold text-sm md:text-base">Escrow Timeline</h3>
             <Separator />
-            <div className="space-y-3">
+            <div className="space-y-3 text-sm">
               <div className="flex justify-between">
                 <span className="text-muted-foreground">Created</span>
-                <span className="font-medium">
-                  {format(new Date(payment.created_at), 'MMM d, yyyy HH:mm')}
-                </span>
+                <span className="font-medium">{safeFormat(payment.created_at)}</span>
               </div>
               {payment.held_at && (
                 <div className="flex justify-between">
                   <span className="text-muted-foreground">Held in Escrow</span>
-                  <span className="font-medium">
-                    {format(new Date(payment.held_at), 'MMM d, yyyy HH:mm')}
-                  </span>
+                  <span className="font-medium">{safeFormat(payment.held_at)}</span>
                 </div>
               )}
               {payment.released_at && (
                 <div className="flex justify-between">
                   <span className="text-muted-foreground">Released</span>
-                  <span className="font-medium text-green-600">
-                    {format(new Date(payment.released_at), 'MMM d, yyyy HH:mm')}
+                  <span className="font-medium text-green-600 dark:text-green-400">
+                    {safeFormat(payment.released_at)}
                   </span>
                 </div>
               )}
@@ -297,45 +320,53 @@ export default function PaymentDetailsPage() {
       {/* Job & Customer Info */}
       <Card>
         <CardContent className="p-6 space-y-4">
-          <h3 className="font-semibold">Related Job</h3>
+          <h3 className="font-semibold text-sm md:text-base">Related Engagement</h3>
           <Separator />
-          <div className="space-y-2">
-            <Link href={`/jobs/${payment.job?.id}`} className="hover:text-orange-500">
-              <p className="font-medium">{payment.job?.title || 'Job'}</p>
-              <p className="text-sm text-muted-foreground">
-                {payment.job?.description || 'No description'}
+          {payment.job ? (
+            <Link href={`/jobs/${payment.job.id}`} className="block group">
+              <p className="font-medium group-hover:text-orange-500 transition-colors">
+                {payment.job.title}
+              </p>
+              <p className="text-xs text-muted-foreground line-clamp-2 mt-0.5">
+                {payment.job.description}
               </p>
             </Link>
-          </div>
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-4 pt-2">
+          ) : (
+            <p className="text-sm text-muted-foreground">No linked job records found</p>
+          )}
+
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-4 pt-3 border-t text-sm">
             <div>
-              <p className="text-sm text-muted-foreground">Customer</p>
-              <p className="font-medium">{payment.customer?.full_name}</p>
-              <p className="text-sm">{payment.customer?.email}</p>
+              <p className="text-xs text-muted-foreground">Customer</p>
+              <p className="font-medium mt-0.5">{payment.customer?.full_name || 'N/A'}</p>
+              <p className="text-xs text-muted-foreground">{payment.customer?.email}</p>
             </div>
             <div>
-              <p className="text-sm text-muted-foreground">Provider</p>
-              <p className="font-medium">{payment.provider_user?.full_name}</p>
-              <p className="text-sm">{payment.provider_user?.email}</p>
+              <p className="text-xs text-muted-foreground">Logistics Provider</p>
+              <p className="font-medium mt-0.5">{payment.provider_user?.full_name || 'N/A'}</p>
+              <p className="text-xs text-muted-foreground">{payment.provider_user?.email}</p>
             </div>
           </div>
         </CardContent>
       </Card>
 
-      {/* Actions */}
-      <div className="flex gap-3">
+      {/* Action Buttons */}
+      <div className="flex flex-wrap gap-3">
         {payment.status === 'held' && (
-          <Button className="gradient-rush text-white">
+          <Button
+            className="bg-orange-500 hover:bg-orange-600 text-white"
+            onClick={handleReleasePayment}
+            disabled={actionLoading}
+          >
+            {actionLoading && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
             Release Payment
           </Button>
         )}
-        {payment.status === 'pending' && (
-          <Button className="gradient-rush text-white">
-            Complete Payment
-          </Button>
-        )}
         {payment.status === 'held' && (
-          <Button variant="outline" className="text-red-600 border-red-200 hover:bg-red-50">
+          <Button
+            variant="outline"
+            className="text-red-600 border-red-200 hover:bg-red-50 dark:hover:bg-red-950/20"
+          >
             Dispute Payment
           </Button>
         )}

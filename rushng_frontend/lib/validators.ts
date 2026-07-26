@@ -1,19 +1,37 @@
 import { isValidEmail, isValidPhone } from './utils';
 
 // ============================================================
+// TYPES & INTERFACES
+// ============================================================
+
+export interface ValidationResult {
+  valid: boolean;
+  message?: string;
+}
+
+export type ValidationRule = {
+  validate: (value: any) => ValidationResult;
+  required?: boolean;
+  requiredMessage?: string;
+};
+
+export type ValidationSchema = Record<string, ValidationRule>;
+
+// ============================================================
 // VALIDATION FUNCTIONS
 // ============================================================
 
 export const validators = {
   /**
-   * Validates a name (minimum 2 characters, letters only)
+   * Validates a name (minimum 2 characters, letters, spaces, hyphens, apostrophes)
    */
-  name: (value: string): { valid: boolean; message?: string } => {
+  name: (value: string): ValidationResult => {
     if (!value || value.trim().length < 2) {
       return { valid: false, message: 'Name must be at least 2 characters' };
     }
-    if (!/^[a-zA-Z\s\-']+$/.test(value)) {
-      return { valid: false, message: 'Name can only contain letters' };
+    // Supports compound/hyphenated names, apostrophes, and unicode letters
+    if (!/^[a-zA-Z\u00C0-\u024F\s\-']+$/.test(value.trim())) {
+      return { valid: false, message: 'Name can only contain letters and standard characters' };
     }
     return { valid: true };
   },
@@ -21,7 +39,7 @@ export const validators = {
   /**
    * Validates an email address
    */
-  email: (value: string): { valid: boolean; message?: string } => {
+  email: (value: string): ValidationResult => {
     if (!value) {
       return { valid: false, message: 'Email is required' };
     }
@@ -32,9 +50,9 @@ export const validators = {
   },
 
   /**
-   * Validates a phone number
+   * Validates a Nigerian phone number
    */
-  phone: (value: string): { valid: boolean; message?: string } => {
+  phone: (value: string): ValidationResult => {
     if (!value) {
       return { valid: false, message: 'Phone number is required' };
     }
@@ -45,9 +63,9 @@ export const validators = {
   },
 
   /**
-   * Validates a password
+   * Validates a password (minimum 8 chars, 1 letter, 1 number)
    */
-  password: (value: string): { valid: boolean; message?: string } => {
+  password: (value: string): ValidationResult => {
     if (!value) {
       return { valid: false, message: 'Password is required' };
     }
@@ -64,9 +82,12 @@ export const validators = {
   },
 
   /**
-   * Validates password confirmation
+   * Validates password confirmation matches
    */
-  confirmPassword: (password: string, confirm: string): { valid: boolean; message?: string } => {
+  confirmPassword: (password: string, confirm: string): ValidationResult => {
+    if (!confirm) {
+      return { valid: false, message: 'Please confirm your password' };
+    }
     if (password !== confirm) {
       return { valid: false, message: 'Passwords do not match' };
     }
@@ -74,9 +95,9 @@ export const validators = {
   },
 
   /**
-   * Validates an address
+   * Validates a physical address
    */
-  address: (value: string): { valid: boolean; message?: string } => {
+  address: (value: string): ValidationResult => {
     if (!value || value.trim().length < 5) {
       return { valid: false, message: 'Address must be at least 5 characters' };
     }
@@ -84,9 +105,9 @@ export const validators = {
   },
 
   /**
-   * Validates a title
+   * Validates a title (5 - 255 chars)
    */
-  title: (value: string): { valid: boolean; message?: string } => {
+  title: (value: string): ValidationResult => {
     if (!value || value.trim().length < 5) {
       return { valid: false, message: 'Title must be at least 5 characters' };
     }
@@ -97,9 +118,9 @@ export const validators = {
   },
 
   /**
-   * Validates a description
+   * Validates a description (20 - 5000 chars)
    */
-  description: (value: string): { valid: boolean; message?: string } => {
+  description: (value: string): ValidationResult => {
     if (!value || value.trim().length < 20) {
       return { valid: false, message: 'Description must be at least 20 characters' };
     }
@@ -110,53 +131,61 @@ export const validators = {
   },
 
   /**
-   * Validates a price
+   * Validates a price / financial amount
    */
-  price: (value: number): { valid: boolean; message?: string } => {
-    if (value === undefined || value === null) {
-      return { valid: true }; // Price is optional
+  price: (value: number | string): ValidationResult => {
+    if (value === undefined || value === null || value === '') {
+      return { valid: true }; // Price is optional unless required by schema
     }
-    if (value < 0) {
+    const numValue = typeof value === 'string' ? parseFloat(value) : value;
+
+    if (isNaN(numValue)) {
+      return { valid: false, message: 'Please enter a valid numeric price' };
+    }
+    if (numValue < 0) {
       return { valid: false, message: 'Price cannot be negative' };
     }
-    if (value > 1000000000) {
-      return { valid: false, message: 'Price exceeds maximum allowed' };
+    if (numValue > 1000000000) {
+      return { valid: false, message: 'Price exceeds maximum allowed amount' };
     }
     return { valid: true };
   },
 
   /**
-   * Validates a rating (1-5)
+   * Validates a rating score (1 to 5)
    */
-  rating: (value: number): { valid: boolean; message?: string } => {
-    if (!value || value < 1 || value > 5) {
+  rating: (value: number): ValidationResult => {
+    const num = typeof value === 'string' ? parseInt(value, 10) : value;
+    if (isNaN(num) || num < 1 || num > 5) {
       return { valid: false, message: 'Rating must be between 1 and 5' };
     }
     return { valid: true };
   },
 
   /**
-   * Validates NIN (11 digits)
+   * Validates a Nigerian NIN (11 digits)
    */
-  nin: (value: string): { valid: boolean; message?: string } => {
+  nin: (value: string): ValidationResult => {
     if (!value) {
       return { valid: false, message: 'NIN is required' };
     }
-    if (!/^\d{11}$/.test(value)) {
-      return { valid: false, message: 'NIN must be 11 digits' };
+    const cleanNin = value.trim();
+    if (!/^\d{11}$/.test(cleanNin)) {
+      return { valid: false, message: 'NIN must be exactly 11 digits' };
     }
     return { valid: true };
   },
 
   /**
-   * Validates BVN (11 digits)
+   * Validates a Nigerian BVN (11 digits)
    */
-  bvn: (value: string): { valid: boolean; message?: string } => {
+  bvn: (value: string): ValidationResult => {
     if (!value) {
       return { valid: false, message: 'BVN is required' };
     }
-    if (!/^\d{11}$/.test(value)) {
-      return { valid: false, message: 'BVN must be 11 digits' };
+    const cleanBvn = value.trim();
+    if (!/^\d{11}$/.test(cleanBvn)) {
+      return { valid: false, message: 'BVN must be exactly 11 digits' };
     }
     return { valid: true };
   },
@@ -164,46 +193,39 @@ export const validators = {
   /**
    * Validates a URL
    */
-  url: (value: string): { valid: boolean; message?: string } => {
-    if (!value) return { valid: true }; // URL is optional
+  url: (value: string): ValidationResult => {
+    if (!value) return { valid: true }; // Optional unless required
     try {
       new URL(value);
       return { valid: true };
     } catch {
-      return { valid: false, message: 'Please enter a valid URL' };
+      return { valid: false, message: 'Please enter a valid URL (e.g. https://...)' };
     }
   },
 
   /**
-   * Validates a location (latitude/longitude)
+   * Validates geographic coordinates
    */
-  location: (lat: number, lng: number): { valid: boolean; message?: string } => {
-    if (lat === undefined || lng === undefined) {
-      return { valid: false, message: 'Location is required' };
+  location: (lat: number, lng: number): ValidationResult => {
+    if (lat === undefined || lng === undefined || lat === null || lng === null) {
+      return { valid: false, message: 'Location coordinates are required' };
     }
-    if (lat < -90 || lat > 90) {
-      return { valid: false, message: 'Invalid latitude' };
+    if (isNaN(lat) || lat < -90 || lat > 90) {
+      return { valid: false, message: 'Invalid latitude value' };
     }
-    if (lng < -180 || lng > 180) {
-      return { valid: false, message: 'Invalid longitude' };
+    if (isNaN(lng) || lng < -180 || lng > 180) {
+      return { valid: false, message: 'Invalid longitude value' };
     }
     return { valid: true };
   },
 };
 
 // ============================================================
-// FORM VALIDATION HELPERS
+// FORM VALIDATION HELPER
 // ============================================================
 
-export type ValidationRule = {
-  validate: (value: any) => { valid: boolean; message?: string };
-  required?: boolean;
-};
-
-export type ValidationSchema = Record<string, ValidationRule>;
-
 /**
- * Validates a form against a schema
+ * Validates form state objects against a validation schema
  */
 export function validateForm(
   data: Record<string, any>,
@@ -214,14 +236,21 @@ export function validateForm(
 
   for (const [field, rule] of Object.entries(schema)) {
     const value = data[field];
-    
-    if (rule.required && (value === undefined || value === null || value === '')) {
-      errors[field] = `${field} is required`;
+
+    const isEmpty =
+      value === undefined ||
+      value === null ||
+      (typeof value === 'string' && value.trim() === '') ||
+      (Array.isArray(value) && value.length === 0);
+
+    if (rule.required && isEmpty) {
+      const fieldLabel = field.replace(/_/g, ' ');
+      errors[field] = rule.requiredMessage || `${fieldLabel.charAt(0).toUpperCase() + fieldLabel.slice(1)} is required`;
       isValid = false;
       continue;
     }
 
-    if (value !== undefined && value !== null && value !== '') {
+    if (!isEmpty) {
       const result = rule.validate(value);
       if (!result.valid) {
         errors[field] = result.message || `Invalid ${field}`;

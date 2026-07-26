@@ -2,16 +2,9 @@
 
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { ThemeProvider } from 'next-themes';
-import { useState, useEffect } from 'react';
+import { useState } from 'react';
 
 export function Providers({ children }: { children: React.ReactNode }) {
-  const [mounted, setMounted] = useState(false);
-
-  // ✅ Prevent hydration mismatch for theme
-  useEffect(() => {
-    setMounted(true);
-  }, []);
-
   const [queryClient] = useState(
     () =>
       new QueryClient({
@@ -24,10 +17,6 @@ export function Providers({ children }: { children: React.ReactNode }) {
         },
       })
   );
-
-  if (!mounted) {
-    return <>{children}</>;
-  }
 
   return (
     <QueryClientProvider client={queryClient}>

@@ -5,24 +5,50 @@ import { paymentApi } from '@/lib/api';
 import { toast } from 'sonner';
 import type { Payment } from '@/types';
 
+export interface InitializePaymentPayload {
+  amount: number;
+  email?: string;
+  job_id?: string;
+  callback_url?: string;
+  metadata?: Record<string, any>;
+  [key: string]: any;
+}
+
+export interface PaymentInitializationResult {
+  authorization_url?: string;
+  access_code?: string;
+  reference: string;
+  [key: string]: any;
+}
+
 export function usePayments() {
   const [payments, setPayments] = useState<Payment[]>([]);
-  const [loading, setLoading] = useState(false);
+  const [loading, setLoading] = useState<boolean>(false);
   const [error, setError] = useState<string | null>(null);
 
-  const fetchPayments = useCallback(async () => {
+  const fetchPayments = useCallback(async (): Promise<Payment[] | null> => {
     setLoading(true);
     setError(null);
     try {
       const response = await paymentApi.me();
-      if (response.data.success) {
-        setPayments(response.data.data.payments || []);
-        return response.data.data;
+      if (response.data?.success) {
+        const resData = response.data.data || {};
+        const list: Payment[] = Array.isArray(resData)
+          ? resData
+          : resData.payments || response.data?.payments || [];
+
+        setPayments(list);
+        return list;
       }
-      setError(response.data.message || 'Failed to load payments');
+      const msg = response.data?.message || 'Failed to load payments';
+      setError(msg);
       return null;
-    } catch (error: any) {
-      setError(error.response?.data?.error || 'Failed to load payments');
+    } catch (err: any) {
+      const msg =
+        err.response?.data?.error ||
+        err.response?.data?.message ||
+        'Failed to load payments. Please try again.';
+      setError(msg);
       toast.error('Failed to load payments');
       return null;
     } finally {
@@ -30,65 +56,102 @@ export function usePayments() {
     }
   }, []);
 
-  const initializePayment = async (data: any) => {
-    try {
-      const response = await paymentApi.initialize(data);
-      if (response.data.success) {
-        const result = response.data.data;
-        if (result.authorization_url) {
-          window.location.href = result.authorization_url;
-        }
-        return result;
-      }
-      toast.error(response.data.message || 'Payment initialization failed');
-      return null;
-    } catch (error: any) {
-      toast.error(error.response?.data?.error || 'Payment initialization failed');
-      return null;
-    }
-  };
+  const initializePayment = useCallback(
+    async (
+      data: InitializePaymentPayload,
+      options: { autoRedirect?: boolean } = { autoRedirect: true }
+    ): Promise<PaymentInitializationResult | null> => {
+      setLoading(true);
+      setError(null);
+      try {
+        const response = await paymentApi.initialize(data);
+        if (response.data?.success) {
+          const result: PaymentInitializationResult = response.data.data;
 
-  const verifyPayment = async (reference: string) => {
+          if (options.autoRedirect && result?.authorization_url) {
+            window.location.href = result.authorization_url;
+          }
+
+          return result;
+        }
+
+        const msg = response.data?.message || 'Payment initialization failed';
+        toast.error(msg);
+        setError(msg);
+        return null;
+      } catch (err: any) {
+        const msg =
+          err.response?.data?.error ||
+          err.response?.data?.message ||
+          'Payment initialization failed';
+        toast.error(msg);
+        setError(msg);
+        return null;
+      } finally {
+        setLoading(false);
+      }
+    },
+    []
+  );
+
+  const verifyPayment = useCallback(async (reference: string): Promise<Payment | null> => {
+    setLoading(true);
+    setError(null);
     try {
       const response = await paymentApi.verify({ reference });
-      if (response.data.success) {
+      if (response.data?.success) {
         toast.success('Payment verified successfully!');
         return response.data.data;
       }
-      toast.error(response.data.message || 'Payment verification failed');
-      return null;
-    } catch (error: any) {
-      toast.error(error.response?.data?.error || 'Payment verification failed');
-      return null;
-    }
-  };
 
-  const getPayment = async (id: string) => {
+      const msg = response.data?.message || 'Payment verification failed';
+      toast.error(msg);
+      setError(msg);
+      return null;
+    } catch (err: any) {
+      const msg =
+        err.response?.data?.error ||
+        err.response?.data?.message ||
+        'Payment verification failed';
+      toast.error(msg);
+      setError(msg);
+      return null;
+    } finally {
+      setLoading(false);
+    }
+  }, []);
+
+  const getPayment = useCallback(async (id: string): Promise<Payment | null> => {
     try {
       const response = await paymentApi.get(id);
-      if (response.data.success) {
+      if (response.data?.success) {
         return response.data.data;
       }
-      toast.error(response.data.message || 'Failed to load payment');
+      toast.error(response.data?.message || 'Failed to load payment details');
       return null;
-    } catch (error: any) {
-      toast.error(error.response?.data?.error || 'Failed to load payment');
+    } catch (err: any) {
+      toast.error(
+        err.response?.data?.error ||
+          err.response?.data?.message ||
+          'Failed to load payment details'
+      );
       return null;
     }
-  };
+  }, []);
 
-  const getJobPayments = async (jobId: string) => {
+  const getJobPayments = useCallback(async (jobId: string): Promise<Payment[]> => {
     try {
       const response = await paymentApi.job(jobId);
-      if (response.data.success) {
-        return response.data.data.payments || [];
+      if (response.data?.success) {
+        const resData = response.data.data || {};
+        return Array.isArray(resData) ? resData : resData.payments || [];
       }
       return [];
-    } catch (error: any) {
+    } catch {
       toast.error('Failed to load job payments');
       return [];
     }
-  };
+  }, []);
 
   return {
     payments,

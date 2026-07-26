@@ -1,25 +1,34 @@
 'use client';
 
-import { useState, useEffect, useCallback } from 'react';
+import { useState, useEffect, useCallback, useRef } from 'react';
 import { toast } from 'sonner';
 
-interface LocationState {
+export interface LocationState {
   lat: number;
   lng: number;
   accuracy?: number;
   address?: string;
+  heading?: number | null;
+  speed?: number | null;
 }
 
 export function useLocation() {
   const [location, setLocation] = useState<LocationState | null>(null);
-  const [loading, setLoading] = useState(false);
+  const [loading, setLoading] = useState<boolean>(false);
   const [error, setError] = useState<string | null>(null);
-  const [watchId, setWatchId] = useState<number | null>(null);
+  
+  // Use a ref for watchId so cleanup function always references the current ID without triggering re-renders
+  const watchIdRef = useRef<number | null>(null);
+  
+  // Cache reverse geocode results in memory to avoid hitting public API rate limits
+  const addressCacheRef = useRef<Map<string, string>>(new Map());
 
   const getCurrentLocation = useCallback((): Promise<LocationState> => {
     return new Promise((resolve, reject) => {
-      if (!navigator.geolocation) {
-        reject(new Error('Geolocation is not supported'));
+      if (typeof window === 'undefined' || !navigator.geolocation) {
+        const msg = 'Geolocation is not supported by your browser';
+        setError(msg);
+        reject(new Error(msg));
         return;
       }
 
@@ -28,100 +37,141 @@ export function useLocation() {
 
       navigator.geolocation.getCurrentPosition(
         (position) => {
-          const { latitude, longitude, accuracy } = position.coords;
-          const newLocation = { lat: latitude, lng: longitude, accuracy };
+          const { latitude, longitude, accuracy, heading, speed } = position.coords;
+          const newLocation: LocationState = {
+            lat: latitude,
+            lng: longitude,
+            accuracy,
+            heading,
+            speed,
+          };
           setLocation(newLocation);
           setLoading(false);
           resolve(newLocation);
         },
-        (error) => {
+        (err) => {
           let message = 'Failed to get location';
-          if (error.code === 1) message = 'Please enable GPS and try again';
-          else if (error.code === 2) message = 'GPS signal unavailable';
-          else if (error.code === 3) message = 'GPS request timed out';
+          if (err.code === err.PERMISSION_DENIED) {
+            message = 'Location access denied. Please enable GPS permissions.';
+          } else if (err.code === err.POSITION_UNAVAILABLE) {
+            message = 'GPS signal unavailable. Try moving outdoors.';
+          } else if (err.code === err.TIMEOUT) {
+            message = 'GPS request timed out. Please try again.';
+          }
           setError(message);
           setLoading(false);
           reject(new Error(message));
         },
-        { enableHighAccuracy: true, timeout: 10000 }
+        { enableHighAccuracy: true, timeout: 15000, maximumAge: 5000 }
       );
     });
   }, []);
 
-  const startWatching = useCallback(() => {
-    if (!navigator.geolocation) {
-      toast.error('Geolocation is not supported');
-      return;
+  const stopWatching = useCallback(() => {
+    if (watchIdRef.current !== null && typeof window !== 'undefined' && navigator.geolocation) {
+      navigator.geolocation.clearWatch(watchIdRef.current);
+      watchIdRef.current = null;
     }
+  }, []);
+
+  const startWatching = useCallback(() => {
+    if (typeof window === 'undefined' || !navigator.geolocation) {
+      const msg = 'Geolocation is not supported';
+      toast.error(msg);
+      setError(msg);
+      return null;
+    }
+
+    // Stop existing watcher if active before starting a new one
+    stopWatching();
 
     const id = navigator.geolocation.watchPosition(
       (position) => {
-        const { latitude, longitude, accuracy } = position.coords;
-        setLocation({ lat: latitude, lng: longitude, accuracy });
+        const { latitude, longitude, accuracy, heading, speed } = position.coords;
+        setLocation((prev) => ({
+          ...prev,
+          lat: latitude,
+          lng: longitude,
+          accuracy,
+          heading,
+          speed,
+        }));
         setError(null);
       },
-      (error) => {
+      (err) => {
         let message = 'Failed to watch location';
-        if (error.code === 1) message = 'Please enable GPS';
-        else if (error.code === 2) message = 'GPS signal unavailable';
-        else if (error.code === 3) message = 'GPS request timed out';
+        if (err.code === err.PERMISSION_DENIED) message = 'Please enable GPS permissions';
+        else if (err.code === err.POSITION_UNAVAILABLE) message = 'GPS signal lost';
+        else if (err.code === err.TIMEOUT) message = 'GPS connection timed out';
         setError(message);
       },
-      { enableHighAccuracy: true, timeout: 10000 }
+      { enableHighAccuracy: true, timeout: 15000, maximumAge: 2000 }
     );
 
-    setWatchId(id);
+    watchIdRef.current = id;
     return id;
-  }, []);
-
-  const stopWatching = useCallback(() => {
-    if (watchId) {
-      navigator.geolocation.clearWatch(watchId);
-      setWatchId(null);
-    }
-  }, [watchId]);
+  }, [stopWatching]);
 
   const reverseGeocode = useCallback(async (lat: number, lng: number): Promise<string> => {
+    const key = `${lat.toFixed(4)},${lng.toFixed(4)}`;
+    
+    // Check local memory cache
+    if (addressCacheRef.current.has(key)) {
+      return addressCacheRef.current.get(key)!;
+    }
+
     try {
       const response = await fetch(
         `https://nominatim.openstreetmap.org/reverse?format=json&lat=${lat}&lon=${lng}&zoom=18&addressdetails=1`,
-        { headers: { 'User-Agent': 'RUSHNG' } }
+        {
+          headers: {
+            'Accept-Language': 'en',
+            'User-Agent': 'RushNG Logistics App',
+          },
+        }
       );
+
+      if (!response.ok) throw new Error('Geocoding service unavailable');
+
       const data = await response.json();
-      if (data.display_name) {
-        return data.display_name;
-      }
-      return `${lat.toFixed(6)}, ${lng.toFixed(6)}`;
+      const address = data.display_name || `${lat.toFixed(6)}, ${lng.toFixed(6)}`;
+      
+      // Store in cache
+      addressCacheRef.current.set(key, address);
+      return address;
     } catch {
       return `${lat.toFixed(6)}, ${lng.toFixed(6)}`;
     }
   }, []);
 
+  // Haversine formula calculation for distance in kilometers
   const calculateDistance = useCallback((lat1: number, lng1: number, lat2: number, lng2: number): number => {
-    const R = 6371; // Earth's radius in km
-    const dLat = (lat2 - lat1) * Math.PI / 180;
-    const dLng = (lng2 - lng1) * Math.PI / 180;
-    const a = 
-      Math.sin(dLat/2) * Math.sin(dLat/2) +
-      Math.cos(lat1 * Math.PI / 180) * Math.cos(lat2 * Math.PI / 180) *
-      Math.sin(dLng/2) * Math.sin(dLng/2);
-    const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1-a));
+    const R = 6371; // Earth's radius in kilometers
+    const toRad = (angle: number) => (angle * Math.PI) / 180;
+
+    const dLat = toRad(lat2 - lat1);
+    const dLng = toRad(lng2 - lng1);
+
+    const a =
+      Math.sin(dLat / 2) * Math.sin(dLat / 2) +
+      Math.cos(toRad(lat1)) * Math.cos(toRad(lat2)) * Math.sin(dLng / 2) * Math.sin(dLng / 2);
+
+    const c = 2 * Math.atan2(Math.sqrt(Math.min(1, a)), Math.sqrt(Math.max(0, 1 - a)));
     return R * c;
   }, []);
 
-  // Clean up on unmount
+  // Automatic cleanup on unmount
   useEffect(() => {
     return () => {
-      if (watchId) {
-        navigator.geolocation.clearWatch(watchId);
-      }
+      stopWatching();
     };
-  }, [watchId]);
+  }, [stopWatching]);
 
   return {
     location,
     loading,
     error,
+    isWatching: watchIdRef.current !== null,
     getCurrentLocation,
     startWatching,
     stopWatching,

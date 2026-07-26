@@ -1,18 +1,18 @@
 'use client';
 
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useCallback } from 'react';
 import { useParams, useRouter } from 'next/navigation';
-import { jobApi, providerApi } from '@/lib/api';
+import { jobApi } from '@/lib/api';
 import { useAuth } from '@/hooks/useAuth';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { Skeleton } from '@/components/ui/skeleton';
 import { 
-  MapPin, Calendar, DollarSign, User, Phone, 
+  MapPin, Calendar, User, Phone, 
   Mail, Clock, CheckCircle, XCircle 
 } from 'lucide-react';
-import { formatDistanceToNow, format } from 'date-fns';
+import { formatDistanceToNow } from 'date-fns';
 import { toast } from 'sonner';
 
 interface Job {
@@ -21,23 +21,23 @@ interface Job {
   description: string;
   category: string;
   address: string;
-  city: string;
-  state: string;
+  city?: string;
+  state?: string;
   status: string;
-  estimated_price: number;
-  final_price: number;
+  estimated_price?: number;
+  final_price?: number;
   created_at: string;
   customer: {
     id: string;
     full_name: string;
-    phone: string;
+    phone?: string;
     email: string;
   };
   provider?: {
     id: string;
     full_name: string;
-    phone: string;
-    rating: number;
+    phone?: string;
+    rating?: number;
   };
 }
 
@@ -50,14 +50,10 @@ export default function JobDetailsPage() {
   const [applying, setApplying] = useState(false);
   const jobId = params.id as string;
 
-  useEffect(() => {
-    fetchJob();
-  }, [jobId]);
-
-  const fetchJob = async () => {
+  const fetchJob = useCallback(async () => {
     try {
       const response = await jobApi.get(jobId);
-      if (response.data.success) {
+      if (response.data?.success) {
         setJob(response.data.data.job);
       }
     } catch (error) {
@@ -65,7 +61,11 @@ export default function JobDetailsPage() {
     } finally {
       setLoading(false);
     }
-  };
+  }, [jobId]);
+
+  useEffect(() => {
+    fetchJob();
+  }, [fetchJob]);
 
   const handleApply = async () => {
     if (!isAuthenticated) {
@@ -76,7 +76,7 @@ export default function JobDetailsPage() {
     setApplying(true);
     try {
       const response = await jobApi.apply(jobId, {});
-      if (response.data.success) {
+      if (response.data?.success) {
         toast.success('Applied successfully!');
         fetchJob();
       }
@@ -106,7 +106,7 @@ export default function JobDetailsPage() {
     );
   }
 
-  const isOwner = user?.id === job.customer.id;
+  const isOwner = user?.id === job.customer?.id;
   const canApply = !isOwner && job.status === 'posted' && user?.role === 'provider';
 
   return (
@@ -122,7 +122,7 @@ export default function JobDetailsPage() {
               <h1 className="text-2xl font-bold mb-2">{job.title}</h1>
               <div className="flex flex-wrap gap-2">
                 <Badge>{job.category}</Badge>
-                <Badge variant="outline">{job.status.replace('_', ' ').toUpperCase()}</Badge>
+                <Badge variant="outline">{job.status?.replace('_', ' ').toUpperCase()}</Badge>
                 {job.estimated_price && (
                   <Badge variant="secondary">₦{job.estimated_price.toLocaleString()}</Badge>
                 )}
@@ -160,19 +160,19 @@ export default function JobDetailsPage() {
             <div className="bg-gray-50 rounded-lg p-4">
               <h3 className="font-semibold mb-2">Posted by</h3>
               <div className="flex items-center gap-3">
-                <div className="flex h-10 w-10 items-center justify-center rounded-full bg-orange-100 text-orange-600">
-                  {job.customer.full_name.charAt(0)}
+                <div className="flex h-10 w-10 items-center justify-center rounded-full bg-orange-100 text-orange-600 font-semibold">
+                  {job.customer?.full_name?.charAt(0) || 'C'}
                 </div>
                 <div>
-                  <p className="font-medium">{job.customer.full_name}</p>
+                  <p className="font-medium">{job.customer?.full_name}</p>
                   <div className="flex gap-3 text-sm text-gray-500">
                     <span className="flex items-center gap-1">
                       <Phone className="h-3 w-3" />
-                      {job.customer.phone || 'Not provided'}
+                      {job.customer?.phone || 'Not provided'}
                     </span>
                     <span className="flex items-center gap-1">
                       <Mail className="h-3 w-3" />
-                      {job.customer.email}
+                      {job.customer?.email}
                     </span>
                   </div>
                 </div>
@@ -184,8 +184,8 @@ export default function JobDetailsPage() {
               <div className="bg-green-50 rounded-lg p-4">
                 <h3 className="font-semibold mb-2">Assigned Provider</h3>
                 <div className="flex items-center gap-3">
-                  <div className="flex h-10 w-10 items-center justify-center rounded-full bg-green-100 text-green-600">
-                    {job.provider.full_name.charAt(0)}
+                  <div className="flex h-10 w-10 items-center justify-center rounded-full bg-green-100 text-green-600 font-semibold">
+                    {job.provider.full_name?.charAt(0) || 'P'}
                   </div>
                   <div>
                     <p className="font-medium">{job.provider.full_name}</p>
@@ -203,7 +203,7 @@ export default function JobDetailsPage() {
 
             {/* Actions for owner */}
             {isOwner && job.status === 'posted' && (
-              <div className="flex gap-3">
+              <div className="flex gap-3 pt-2">
                 <Button variant="outline" className="flex-1">Edit Job</Button>
                 <Button variant="destructive" className="flex-1">Cancel Job</Button>
               </div>

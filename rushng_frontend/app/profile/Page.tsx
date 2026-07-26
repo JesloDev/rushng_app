@@ -7,23 +7,14 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
-import { Avatar, AvatarFallback } from '@/components/ui/avatar';
+import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 import { Skeleton } from '@/components/ui/skeleton';
 import { ImageUploader } from '@/components/shared/ImageUploader';
-import { 
-  User, 
-  Mail, 
-  Phone, 
-  MapPin, 
-  Loader2,
-  CheckCircle2,
-  AlertCircle,
-  Shield,
-} from 'lucide-react';
+import { Loader2, CheckCircle2, AlertCircle, Shield } from 'lucide-react';
 import { toast } from 'sonner';
 
 export default function ProfilePage() {
-  const { user, isAuthenticated, loading: authLoading } = useAuth();
+  const { user, isAuthenticated, loading: authLoading, refetchUser } = useAuth();
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [formData, setFormData] = useState({
@@ -58,6 +49,9 @@ export default function ProfilePage() {
       const response = await authApi.updateProfile(formData);
       if (response.data.success) {
         toast.success('Profile updated successfully!');
+        if (refetchUser) {
+          await refetchUser();
+        }
       }
     } catch (error: any) {
       toast.error(error.response?.data?.error || 'Failed to update profile');
@@ -68,9 +62,9 @@ export default function ProfilePage() {
 
   if (authLoading || loading) {
     return (
-      <div className="container max-w-2xl mx-auto px-4 py-8">
-        <Skeleton className="h-12 w-48 mb-6" />
-        <Skeleton className="h-64 w-full" />
+      <div className="container max-w-2xl mx-auto px-4 py-8 space-y-6">
+        <Skeleton className="h-12 w-48" />
+        <Skeleton className="h-[500px] w-full rounded-xl" />
       </div>
     );
   }
@@ -81,8 +75,9 @@ export default function ProfilePage() {
         <CardHeader>
           <div className="flex items-center gap-4">
             <Avatar className="h-20 w-20">
+              <AvatarImage src={formData.profile_picture} alt={formData.full_name} />
               <AvatarFallback className="text-3xl bg-gradient-to-br from-orange-500 to-amber-600 text-white">
-                {formData.full_name?.charAt(0) || 'U'}
+                {formData.full_name?.charAt(0).toUpperCase() || 'U'}
               </AvatarFallback>
             </Avatar>
             <div>
@@ -93,6 +88,7 @@ export default function ProfilePage() {
             </div>
           </div>
         </CardHeader>
+
         <CardContent>
           <form onSubmit={handleSubmit} className="space-y-4">
             <div className="space-y-2">
@@ -136,7 +132,7 @@ export default function ProfilePage() {
               />
             </div>
 
-            <div className="grid grid-cols-2 gap-4">
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
               <div className="space-y-2">
                 <Label htmlFor="city">City</Label>
                 <Input
@@ -165,21 +161,21 @@ export default function ProfilePage() {
             </div>
 
             {/* Verification Status */}
-            <div className="bg-gray-50 rounded-lg p-4">
-              <div className="flex items-center gap-2 text-sm">
+            <div className="bg-muted/50 rounded-lg p-4 border">
+              <div className="flex items-center gap-2 text-sm font-medium">
                 <Shield className="h-4 w-4 text-orange-500" />
-                <span className="font-medium">Verification Status</span>
+                <span>Verification Status</span>
               </div>
               <div className="flex items-center gap-2 mt-2 text-sm">
                 {user?.is_verified ? (
                   <>
                     <CheckCircle2 className="h-4 w-4 text-green-500" />
-                    <span className="text-green-600">Verified</span>
+                    <span className="text-green-600 font-medium">Verified</span>
                   </>
                 ) : (
                   <>
                     <AlertCircle className="h-4 w-4 text-yellow-500" />
-                    <span className="text-yellow-600">Not Verified</span>
+                    <span className="text-yellow-600 font-medium">Not Verified</span>
                   </>
                 )}
               </div>

@@ -1,7 +1,14 @@
 'use client';
 
+import React from 'react';
 import { Button } from '@/components/ui/button';
-import { ChevronLeft, ChevronRight, MoreHorizontal } from 'lucide-react';
+import {
+  ChevronLeft,
+  ChevronRight,
+  ChevronsLeft,
+  ChevronsRight,
+  MoreHorizontal,
+} from 'lucide-react';
 import { cn } from '@/lib/utils';
 
 interface PaginationProps {
@@ -25,7 +32,7 @@ export function Pagination({
 
   const getPageNumbers = (): (number | string)[] => {
     const pages: (number | string)[] = [];
-    
+
     if (totalPages <= maxVisible) {
       for (let i = 1; i <= totalPages; i++) {
         pages.push(i);
@@ -51,7 +58,7 @@ export function Pagination({
   };
 
   const goToPage = (page: number) => {
-    if (page >= 1 && page <= totalPages) {
+    if (page >= 1 && page <= totalPages && page !== currentPage) {
       onPageChange(page);
     }
   };
@@ -59,25 +66,32 @@ export function Pagination({
   const pageNumbers = getPageNumbers();
 
   return (
-    <div className={cn('flex items-center justify-center gap-1', className)}>
+    <nav
+      aria-label="Pagination Navigation"
+      className={cn('flex items-center justify-center gap-1.5 select-none', className)}
+    >
       {showFirstLast && (
         <Button
           variant="outline"
-          size="sm"
+          size="icon"
           onClick={() => goToPage(1)}
           disabled={currentPage === 1}
-          className="h-9 px-2"
+          className="h-9 w-9 border-slate-200 text-slate-600 hover:bg-slate-100 dark:border-slate-800 dark:text-slate-400"
+          title="First page"
+          aria-label="Go to first page"
         >
-          First
+          <ChevronsLeft className="h-4 w-4" />
         </Button>
       )}
 
       <Button
         variant="outline"
         size="icon"
-        className="h-9 w-9"
+        className="h-9 w-9 border-slate-200 text-slate-600 hover:bg-slate-100 dark:border-slate-800 dark:text-slate-400"
         onClick={() => goToPage(currentPage - 1)}
         disabled={currentPage === 1}
+        title="Previous page"
+        aria-label="Go to previous page"
       >
         <ChevronLeft className="h-4 w-4" />
       </Button>
@@ -85,26 +99,29 @@ export function Pagination({
       {pageNumbers.map((page, index) => {
         if (page === '...') {
           return (
-            <Button
+            <div
               key={`ellipsis-${index}`}
-              variant="outline"
-              size="icon"
-              className="h-9 w-9"
-              disabled
+              className="flex h-9 w-8 items-center justify-center text-slate-400"
+              aria-hidden="true"
             >
               <MoreHorizontal className="h-4 w-4" />
-            </Button>
+            </div>
           );
         }
+
+        const isCurrent = page === currentPage;
 
         return (
           <Button
             key={page}
-            variant={page === currentPage ? 'default' : 'outline'}
+            variant={isCurrent ? 'default' : 'outline'}
             size="sm"
+            aria-current={isCurrent ? 'page' : undefined}
             className={cn(
-              'h-9 min-w-9',
-              page === currentPage && 'bg-gradient-to-r from-orange-500 to-amber-600 text-white hover:from-orange-600 hover:to-amber-700'
+              'h-9 min-w-9 px-3 text-xs font-semibold transition-all',
+              isCurrent
+                ? 'gradient-rush text-white shadow-2xs hover:opacity-95'
+                : 'border-slate-200 text-slate-700 hover:bg-slate-100 dark:border-slate-800 dark:text-slate-300'
             )}
             onClick={() => goToPage(page as number)}
           >
@@ -116,9 +133,11 @@ export function Pagination({
       <Button
         variant="outline"
         size="icon"
-        className="h-9 w-9"
+        className="h-9 w-9 border-slate-200 text-slate-600 hover:bg-slate-100 dark:border-slate-800 dark:text-slate-400"
         onClick={() => goToPage(currentPage + 1)}
         disabled={currentPage === totalPages}
+        title="Next page"
+        aria-label="Go to next page"
       >
         <ChevronRight className="h-4 w-4" />
       </Button>
@@ -126,14 +145,16 @@ export function Pagination({
       {showFirstLast && (
         <Button
           variant="outline"
-          size="sm"
+          size="icon"
           onClick={() => goToPage(totalPages)}
           disabled={currentPage === totalPages}
-          className="h-9 px-2"
+          className="h-9 w-9 border-slate-200 text-slate-600 hover:bg-slate-100 dark:border-slate-800 dark:text-slate-400"
+          title="Last page"
+          aria-label="Go to last page"
         >
-          Last
+          <ChevronsRight className="h-4 w-4" />
         </Button>
       )}
-    </div>
+    </nav>
   );
 }

@@ -97,26 +97,26 @@ rushng-frontend/
 │   │   ├── 📄 LoginForm.tsx
 │   │   ├── 📄 RegisterForm.tsx
 │   │   ├── 📄 VerifyForm.tsx
-│   │   └── 📄 ResetPasswordForm.tsx		**missing
+│   │   └── 📄 ResetPasswordForm.tsx		
 │   │
 │   ├── 📁 jobs/
 │   │   ├── 📄 JobCard.tsx
 │   │   ├── 📄 JobList.tsx
 │   │   ├── 📄 JobDetails.tsx
 │   │   ├── 📄 JobPostForm.tsx
-│   │   ├── 📄 JobTracking.tsx				**missing
-│   │   ├── 📄 JobBids.tsx					**missing
+│   │   ├── 📄 JobTracking.tsx				
+│   │   ├── 📄 JobBids.tsx					
 │   │   ├── 📄 JobFilters.tsx
-│   │   ├── 📄 CheckIn.tsx					**missing
-│   │   └── 📄 CheckOut.tsx					**missing
+│   │   ├── 📄 CheckIn.tsx					
+│   │   └── 📄 CheckOut.tsx					
 │   │
 │   ├── 📁 providers/
 │   │   ├── 📄 Providers.tsx
 │   │   ├── 📄 ProviderCard.tsx
 │   │   ├── 📄 ProviderList.tsx
 │   │   ├── 📄 ProviderProfile.tsx
-│   │   ├── 📄 ProviderRegistration.tsx		**missing
-│   │   ├── 📄 ProviderVerification.tsx		**missing
+│   │   ├── 📄 ProviderRegistration.tsx		
+│   │   ├── 📄 ProviderVerification.tsx		
 │   │   └── 📄 ProviderSearch.tsx
 │   │
 │   ├── 📁 payments/
@@ -129,9 +129,9 @@ rushng-frontend/
 │   │   └── 📄 ViolationCard.tsx
 │   │
 │   ├── 📁 dashboard/
-│   │   ├── 📄 CustomerDashboard.tsx		**missing
-│   │   ├── 📄 ProviderDashboard.tsx		**missing
-│   │   ├── 📄 AdminDashboard.tsx			**missing
+│   │   ├── 📄 CustomerDashboard.tsx		
+│   │   ├── 📄 ProviderDashboard.tsx		
+│   │   ├── 📄 AdminDashboard.tsx			
 │   │   ├── 📄 StatsCard.tsx
 │   │   └── 📄 ChartWidget.tsx
 │   │

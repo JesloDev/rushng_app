@@ -3,7 +3,7 @@ const rawApiUrl = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000';
 const cleanBackendHost = rawApiUrl.replace(/\/api\/?$/, '');
 
 const nextConfig = {
-  // Remote patterns for images
+  // Remote patterns for image optimization
   images: {
     remotePatterns: [
       {
@@ -36,24 +36,15 @@ const nextConfig = {
         port: '',
         pathname: '/**',
       },
-      {
-        protocol: 'https',
-        hostname: '*.cloudinary.com',
-        port: '',
-        pathname: '/**',
-      },
     ],
   },
 
-  // Experimental features
+  // Package optimization
   experimental: {
     optimizePackageImports: ['lucide-react', 'date-fns', 'framer-motion'],
   },
 
-  // Turbopack configuration
-  turbopack: {},
-
-  // API rewrites (proxy to backend without duplicating /api)
+  // API rewrites (proxy to FastAPI backend without duplicating /api prefix)
   async rewrites() {
     return [
       {
@@ -63,7 +54,7 @@ const nextConfig = {
     ];
   },
 
-  // Webpack fallback
+  // Webpack fallbacks for client-side builds
   webpack: (config, { isServer }) => {
     if (!isServer) {
       config.resolve.fallback = {
@@ -77,7 +68,7 @@ const nextConfig = {
     return config;
   },
 
-  // Compiler options
+  // Compiler settings
   compiler: {
     removeConsole: process.env.NODE_ENV === 'production',
   },

@@ -7,24 +7,55 @@ import { Badge } from '@/components/ui/badge';
 import { Avatar, AvatarFallback } from '@/components/ui/avatar';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { RatingStars } from '@/components/shared/RatingStars';
-import { 
-  MapPin, 
-  Briefcase, 
-  Star, 
-  DollarSign, 
-  Shield, 
+import {
+  MapPin,
+  Briefcase,
+  Star,
+  DollarSign,
+  Shield,
   MessageCircle,
   Phone,
   Mail,
   Calendar,
-  Award,
-  Users,
 } from 'lucide-react';
-import { format } from 'date-fns';
+import { format, isValid } from 'date-fns';
+
+export interface ProviderUser {
+  full_name?: string;
+  email?: string;
+  phone?: string;
+}
+
+export interface Provider {
+  id?: string;
+  user?: ProviderUser;
+  verification_level?: string;
+  is_available?: boolean;
+  rating?: number;
+  city?: string;
+  address?: string;
+  total_jobs_completed?: number;
+  hourly_rate?: number;
+  years_experience?: number;
+  compliance_score?: number;
+  description?: string;
+  skills?: string[];
+  portfolio_urls?: string[];
+}
+
+export interface Review {
+  id: string | number;
+  rater?: {
+    full_name?: string;
+  };
+  rating: number;
+  created_at: string | Date;
+  comment?: string;
+}
 
 interface ProviderProfileProps {
-  provider: any;
-  reviews?: any[];
+  provider: Provider;
+  reviews?: Review[];
   isOwner?: boolean;
   onHire?: () => void;
   onMessage?: () => void;
@@ -39,6 +70,11 @@ export function ProviderProfile({
 }: ProviderProfileProps) {
   const [activeTab, setActiveTab] = useState('about');
 
+  const formatDateSafe = (dateStr: string | Date) => {
+    const d = new Date(dateStr);
+    return isValid(d) ? format(d, 'MMM d, yyyy') : 'Recently';
+  };
+
   return (
     <div className="space-y-6">
       {/* Header */}
@@ -46,27 +82,30 @@ export function ProviderProfile({
         <CardContent className="p-6">
           <div className="flex flex-col md:flex-row gap-6">
             <Avatar className="h-24 w-24 md:h-32 md:w-32">
-              <AvatarFallback className="text-4xl bg-gradient-to-br from-orange-500 to-amber-600 text-white">
-                {provider.user?.full_name?.charAt(0) || 'P'}
+              <AvatarFallback className="text-4xl bg-gradient-to-br from-orange-500 to-amber-600 text-white font-bold">
+                {provider.user?.full_name?.charAt(0).toUpperCase() || 'P'}
               </AvatarFallback>
             </Avatar>
 
             <div className="flex-1">
               <div className="flex flex-wrap items-start justify-between gap-2">
                 <div>
-                  <h1 className="text-2xl font-bold">{provider.user?.full_name}</h1>
+                  <h1 className="text-2xl font-bold">{provider.user?.full_name || 'Service Provider'}</h1>
                   <div className="flex flex-wrap items-center gap-2 mt-1">
-                    <Badge className="bg-orange-100 text-orange-700">
+                    <Badge className="bg-orange-100 text-orange-700 hover:bg-orange-200 border-none">
                       {provider.verification_level?.toUpperCase() || 'BASIC'}
                     </Badge>
                     {provider.is_available ? (
-                      <Badge className="bg-green-100 text-green-700">Available</Badge>
+                      <Badge className="bg-green-100 text-green-700 hover:bg-green-200 border-none">
+                        Available
+                      </Badge>
                     ) : (
                       <Badge variant="secondary">Busy</Badge>
                     )}
                     <RatingStars rating={provider.rating || 0} size="sm" />
                   </div>
                 </div>
+
                 <div className="flex gap-2">
                   {!isOwner && (
                     <>
@@ -93,7 +132,7 @@ export function ProviderProfile({
                 </div>
                 <div className="flex items-center gap-1">
                   <DollarSign className="h-4 w-4" />
-                  <span>₦{provider.hourly_rate?.toLocaleString() || 'Negotiable'}/hr</span>
+                  <span>₦{provider.hourly_rate ? provider.hourly_rate.toLocaleString() : 'Negotiable'}/hr</span>
                 </div>
                 <div className="flex items-center gap-1">
                   <Calendar className="h-4 w-4" />
@@ -101,7 +140,7 @@ export function ProviderProfile({
                 </div>
                 <div className="flex items-center gap-1">
                   <Shield className="h-4 w-4" />
-                  <span>Compliance: {provider.compliance_score || 100}%</span>
+                  <span>Compliance: {provider.compliance_score ?? 100}%</span>
                 </div>
               </div>
             </div>
@@ -109,7 +148,7 @@ export function ProviderProfile({
         </CardContent>
       </Card>
 
-      {/* Tabs */}
+      {/* Tabs Section */}
       <Tabs value={activeTab} onValueChange={setActiveTab} className="space-y-6">
         <TabsList className="grid w-full grid-cols-3">
           <TabsTrigger value="about">About</TabsTrigger>
@@ -117,25 +156,27 @@ export function ProviderProfile({
           <TabsTrigger value="portfolio">Portfolio</TabsTrigger>
         </TabsList>
 
+        {/* About Tab */}
         <TabsContent value="about" className="space-y-6">
           <Card>
-            <CardContent className="p-6 space-y-4">
+            <CardContent className="p-6 space-y-6">
               <div>
-                <h3 className="font-semibold mb-2">About Me</h3>
-                <p className="text-gray-600 whitespace-pre-wrap">
+                <h3 className="font-semibold text-lg mb-2">About Me</h3>
+                <p className="text-muted-foreground whitespace-pre-wrap leading-relaxed">
                   {provider.description || 'No description provided yet.'}
                 </p>
               </div>
 
               <div>
-                <h3 className="font-semibold mb-2">Skills</h3>
+                <h3 className="font-semibold text-lg mb-2">Skills</h3>
                 <div className="flex flex-wrap gap-2">
-                  {provider.skills?.map((skill: string) => (
-                    <Badge key={skill} variant="secondary">
-                      {skill.charAt(0).toUpperCase() + skill.slice(1)}
-                    </Badge>
-                  ))}
-                  {(!provider.skills || provider.skills.length === 0) && (
+                  {provider.skills && provider.skills.length > 0 ? (
+                    provider.skills.map((skill) => (
+                      <Badge key={skill} variant="secondary">
+                        {skill.charAt(0).toUpperCase() + skill.slice(1)}
+                      </Badge>
+                    ))
+                  ) : (
                     <p className="text-sm text-muted-foreground">No skills listed</p>
                   )}
                 </div>
@@ -150,13 +191,13 @@ export function ProviderProfile({
                 </div>
                 <div className="text-center">
                   <div className="text-2xl font-bold text-orange-500">
-                    {provider.rating || 'New'}
+                    {provider.rating ? provider.rating.toFixed(1) : 'New'}
                   </div>
                   <p className="text-sm text-muted-foreground">Rating</p>
                 </div>
                 <div className="text-center">
                   <div className="text-2xl font-bold text-orange-500">
-                    {provider.compliance_score || 100}%
+                    {provider.compliance_score ?? 100}%
                   </div>
                   <p className="text-sm text-muted-foreground">Compliance</p>
                 </div>
@@ -168,18 +209,18 @@ export function ProviderProfile({
                 </div>
               </div>
 
-              {/* Contact Info */}
+              {/* Contact Info (Only visible to third parties) */}
               {!isOwner && (
-                <div className="bg-gray-50 rounded-lg p-4 mt-4">
+                <div className="bg-muted/50 rounded-lg p-4">
                   <h3 className="font-semibold mb-2">Contact Information</h3>
                   <div className="space-y-2 text-sm">
-                    <div className="flex items-center gap-2">
-                      <Phone className="h-4 w-4 text-gray-400" />
+                    <div className="flex items-center gap-2 text-muted-foreground">
+                      <Phone className="h-4 w-4" />
                       <span>{provider.user?.phone || 'Not provided'}</span>
                     </div>
-                    <div className="flex items-center gap-2">
-                      <Mail className="h-4 w-4 text-gray-400" />
-                      <span>{provider.user?.email}</span>
+                    <div className="flex items-center gap-2 text-muted-foreground">
+                      <Mail className="h-4 w-4" />
+                      <span>{provider.user?.email || 'Not provided'}</span>
                     </div>
                   </div>
                 </div>
@@ -188,17 +229,18 @@ export function ProviderProfile({
           </Card>
         </TabsContent>
 
+        {/* Reviews Tab */}
         <TabsContent value="reviews">
           <Card>
             <CardContent className="p-6">
               {reviews.length === 0 ? (
                 <div className="text-center py-8">
-                  <Star className="h-12 w-12 text-gray-300 mx-auto mb-4" />
+                  <Star className="h-12 w-12 text-muted-foreground/40 mx-auto mb-4" />
                   <p className="text-muted-foreground">No reviews yet</p>
                 </div>
               ) : (
                 <div className="space-y-4">
-                  {reviews.map((review: any) => (
+                  {reviews.map((review) => (
                     <div key={review.id} className="border-b last:border-0 pb-4 last:pb-0">
                       <div className="flex items-center justify-between">
                         <div>
@@ -206,11 +248,11 @@ export function ProviderProfile({
                           <RatingStars rating={review.rating} size="sm" />
                         </div>
                         <span className="text-sm text-muted-foreground">
-                          {format(new Date(review.created_at), 'MMM d, yyyy')}
+                          {formatDateSafe(review.created_at)}
                         </span>
                       </div>
                       {review.comment && (
-                        <p className="text-sm text-gray-600 mt-2">{review.comment}</p>
+                        <p className="text-sm text-muted-foreground mt-2">{review.comment}</p>
                       )}
                     </div>
                   ))}
@@ -220,22 +262,23 @@ export function ProviderProfile({
           </Card>
         </TabsContent>
 
+        {/* Portfolio Tab */}
         <TabsContent value="portfolio">
           <Card>
             <CardContent className="p-6">
               {!provider.portfolio_urls || provider.portfolio_urls.length === 0 ? (
                 <div className="text-center py-8">
-                  <Briefcase className="h-12 w-12 text-gray-300 mx-auto mb-4" />
+                  <Briefcase className="h-12 w-12 text-muted-foreground/40 mx-auto mb-4" />
                   <p className="text-muted-foreground">No portfolio items yet</p>
                 </div>
               ) : (
                 <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-                  {provider.portfolio_urls.map((url: string, index: number) => (
-                    <div key={index} className="group relative">
+                  {provider.portfolio_urls.map((url, index) => (
+                    <div key={index} className="group relative overflow-hidden rounded-lg border bg-muted">
                       <img
                         src={url}
-                        alt={`Portfolio ${index + 1}`}
-                        className="w-full h-48 object-cover rounded-lg border"
+                        alt={`Portfolio item ${index + 1}`}
+                        className="w-full h-48 object-cover transition-transform duration-300 group-hover:scale-105"
                         onError={(e) => {
                           (e.target as HTMLImageElement).src = '/placeholder-image.jpg';
                         }}

@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useCallback } from 'react';
 import { notificationApi } from '@/lib/api';
 import { useAuth } from '@/hooks/useAuth';
 import { Card, CardContent } from '@/components/ui/card';
@@ -8,37 +8,38 @@ import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { Skeleton } from '@/components/ui/skeleton';
 import { EmptyState } from '@/components/shared/EmptyState';
-import { 
-  Bell, 
-  CheckCheck, 
-  Trash2, 
-  CheckCircle2,
-  Clock,
+import {
+  Bell,
+  CheckCheck,
+  Trash2,
   DollarSign,
   Star,
   AlertCircle,
   Package,
   Users,
 } from 'lucide-react';
-import { formatDistanceToNow } from 'date-fns';
+import { formatDistanceToNow, isValid } from 'date-fns';
 import { toast } from 'sonner';
+
+interface Notification {
+  id: string;
+  type: 'job' | 'payment' | 'rating' | 'violation' | 'system' | 'user' | string;
+  title: string;
+  message: string;
+  is_read: boolean;
+  created_at: string;
+}
 
 export default function NotificationsPage() {
   const { isAuthenticated } = useAuth();
-  const [notifications, setNotifications] = useState([]);
+  const [notifications, setNotifications] = useState<Notification[]>([]);
   const [loading, setLoading] = useState(true);
   const [unreadCount, setUnreadCount] = useState(0);
 
-  useEffect(() => {
-    if (isAuthenticated) {
-      fetchNotifications();
-    }
-  }, [isAuthenticated]);
-
-  const fetchNotifications = async () => {
+  const fetchNotifications = useCallback(async () => {
     try {
       const response = await notificationApi.list();
-      if (response.data.success) {
+      if (response.data?.success) {
         setNotifications(response.data.data.notifications || []);
         setUnreadCount(response.data.data.unread_count || 0);
       }
@@ -47,17 +48,21 @@ export default function NotificationsPage() {
     } finally {
       setLoading(false);
     }
-  };
+  }, []);
+
+  useEffect(() => {
+    if (isAuthenticated) {
+      fetchNotifications();
+    }
+  }, [isAuthenticated, fetchNotifications]);
 
   const markAsRead = async (id: string) => {
     try {
       await notificationApi.markRead(id);
-      setNotifications(prev => 
-        prev.map((n: any) => 
-          n.id === id ? { ...n, is_read: true } : n
-        )
+      setNotifications((prev) =>
+        prev.map((n) => (n.id === id ? { ...n, is_read: true } : n))
       );
-      setUnreadCount(prev => Math.max(0, prev - 1));
+      setUnreadCount((prev) => Math.max(0, prev - 1));
     } catch (error) {
       toast.error('Failed to mark as read');
     }
@@ -66,8 +71,8 @@ export default function NotificationsPage() {
   const markAllAsRead = async () => {
     try {
       await notificationApi.markAllRead();
-      setNotifications(prev => 
-        prev.map((n: any) => ({ ...n, is_read: true }))
+      setNotifications((prev) =>
+        prev.map((n) => ({ ...n, is_read: true }))
       );
       setUnreadCount(0);
       toast.success('All notifications marked as read');
@@ -77,9 +82,13 @@ export default function NotificationsPage() {
   };
 
   const deleteNotification = async (id: string) => {
+    const target = notifications.find((n) => n.id === id);
     try {
       await notificationApi.delete(id);
-      setNotifications(prev => prev.filter((n: any) => n.id !== id));
+      setNotifications((prev) => prev.filter((n) => n.id !== id));
+      if (target && !target.is_read) {
+        setUnreadCount((prev) => Math.max(0, prev - 1));
+      }
     } catch (error) {
       toast.error('Failed to delete notification');
     }
@@ -94,7 +103,12 @@ export default function NotificationsPage() {
       system: <Bell className="h-5 w-5 text-purple-500" />,
       user: <Users className="h-5 w-5 text-orange-500" />,
     };
-    return icons[type] || <Bell className="h-5 w-5 text-gray-500" />;
+    return icons[type] || <Bell className="h-5 w-5 text-muted-foreground" />;
+  };
+
+  const safeFormatDate = (dateString: string) => {
+    const date = new Date(dateString);
+    return isValid(date) ? formatDistanceToNow(date, { addSuffix: true }) : 'Recently';
   };
 
   if (loading) {
@@ -105,7 +119,7 @@ export default function NotificationsPage() {
           <Skeleton className="h-10 w-32" />
         </div>
         {[1, 2, 3, 4].map((i) => (
-          <Skeleton key={i} className="h-20 w-full mb-3" />
+          <Skeleton key={i} className="h-20 w-full mb-3 rounded-xl" />
         ))}
       </div>
     );
@@ -124,12 +138,10 @@ export default function NotificationsPage() {
           )}
         </div>
         {notifications.length > 0 && (
-          <div className="flex gap-2">
-            <Button variant="outline" size="sm" onClick={markAllAsRead}>
-              <CheckCheck className="h-4 w-4 mr-2" />
-              Mark all read
-            </Button>
-          </div>
+          <Button variant="outline" size="sm" onClick={markAllAsRead}>
+            <CheckCheck className="h-4 w-4 mr-2" />
+            Mark all read
+          </Button>
         )}
       </div>
 
@@ -142,52 +154,52 @@ export default function NotificationsPage() {
         />
       ) : (
         <div className="space-y-3">
-          {notifications.map((notification: any) => (
-            <Card 
-              key={notification.id} 
-              className={`transition hover:shadow-md ${!notification.is_read ? 'border-l-4 border-l-orange-500' : ''}`}
+          {notifications.map((notification) => (
+            <Card
+              key={notification.id}
+              className={`transition hover:shadow-sm ${
+                !notification.is_read ? 'border-l-4 border-l-orange-500 bg-orange-50/20 dark:bg-orange-950/10' : ''
+              }`}
             >
               <CardContent className="p-4">
                 <div className="flex items-start gap-4">
-                  <div className="mt-1">
-                    {getIcon(notification.type)}
-                  </div>
+                  <div className="mt-1">{getIcon(notification.type)}</div>
                   <div className="flex-1">
-                    <div className="flex items-start justify-between">
+                    <div className="flex items-start justify-between gap-2">
                       <div>
-                        <p className="font-medium">{notification.title}</p>
-                        <p className="text-sm text-muted-foreground mt-1">
+                        <p className="font-medium text-sm md:text-base">{notification.title}</p>
+                        <p className="text-sm text-muted-foreground mt-0.5">
                           {notification.message}
                         </p>
                       </div>
                       {!notification.is_read && (
-                        <Badge className="bg-orange-500 text-white text-xs">
+                        <Badge className="bg-orange-500 text-white text-xs shrink-0">
                           New
                         </Badge>
                       )}
                     </div>
-                    <div className="flex items-center justify-between mt-2">
+                    <div className="flex items-center justify-between mt-3">
                       <span className="text-xs text-muted-foreground">
-                        {formatDistanceToNow(new Date(notification.created_at), { addSuffix: true })}
+                        {safeFormatDate(notification.created_at)}
                       </span>
                       <div className="flex gap-1">
                         {!notification.is_read && (
-                          <Button 
-                            variant="ghost" 
-                            size="sm" 
+                          <Button
+                            variant="ghost"
+                            size="sm"
                             className="h-7 text-xs"
                             onClick={() => markAsRead(notification.id)}
                           >
                             Mark read
                           </Button>
                         )}
-                        <Button 
-                          variant="ghost" 
-                          size="sm" 
-                          className="h-7 text-xs text-red-500 hover:text-red-700"
+                        <Button
+                          variant="ghost"
+                          size="sm"
+                          className="h-7 text-xs text-red-500 hover:text-red-700 hover:bg-red-50 dark:hover:bg-red-950/30"
                           onClick={() => deleteNotification(notification.id)}
                         >
-                          <Trash2 className="h-3 w-3" />
+                          <Trash2 className="h-3.5 w-3.5" />
                         </Button>
                       </div>
                     </div>

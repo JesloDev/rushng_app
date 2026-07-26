@@ -8,13 +8,6 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Textarea } from '@/components/ui/textarea';
-import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from '@/components/ui/select';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { Progress } from '@/components/ui/progress';
@@ -27,9 +20,6 @@ import {
   User,
   Briefcase,
   Shield,
-  DollarSign,
-  MapPin,
-  Star,
 } from 'lucide-react';
 import { toast } from 'sonner';
 
@@ -44,14 +34,13 @@ const SKILLS_LIST = [
   'plumbing', 'electrical', 'carpentry', 'painting', 'tiling',
   'masonry', 'welding', 'cleaning', 'laundry', 'shopping',
   'errands', 'repair', 'maintenance', 'installation', 'gardening',
-  'pest control', 'roofing', 'fencing', 'plastering', 'tiling',
+  'pest control', 'roofing', 'fencing', 'plastering',
 ];
 
 export default function ProviderRegisterPage() {
   const router = useRouter();
   const { user, isAuthenticated } = useAuth();
   const [currentStep, setCurrentStep] = useState(1);
-  const [loading, setLoading] = useState(false);
   const [submitting, setSubmitting] = useState(false);
   const [completed, setCompleted] = useState(false);
 
@@ -113,8 +102,8 @@ export default function ProviderRegisterPage() {
     }
 
     if (step === 3) {
-      if (!formData.nin || formData.nin.length !== 11) errors.nin = 'Valid NIN is required';
-      if (!formData.bvn || formData.bvn.length !== 11) errors.bvn = 'Valid BVN is required';
+      if (!formData.nin || formData.nin.length !== 11) errors.nin = 'Valid 11-digit NIN is required';
+      if (!formData.bvn || formData.bvn.length !== 11) errors.bvn = 'Valid 11-digit BVN is required';
     }
 
     setValidationErrors(errors);
@@ -168,9 +157,11 @@ export default function ProviderRegisterPage() {
   };
 
   const handleSubmit = async () => {
+    if (submitting) return;
     setSubmitting(true);
     try {
-      const response = await providerApi.register({
+      // Pass form payload (and documents if API accepts FormData or direct payload)
+      const payload = {
         skills: formData.skills,
         years_experience: formData.years_experience,
         hourly_rate: formData.hourly_rate,
@@ -182,9 +173,12 @@ export default function ProviderRegisterPage() {
         address: formData.address,
         city: formData.city,
         state: formData.state,
-      });
+        documents: formData.documents,
+      };
 
-      if (response.data.success) {
+      const response = await providerApi.register(payload);
+
+      if (response.data?.success || response.status === 200 || response.status === 201) {
         setCompleted(true);
         toast.success('Provider registration successful!');
         setTimeout(() => {
@@ -192,7 +186,7 @@ export default function ProviderRegisterPage() {
         }, 3000);
       }
     } catch (error: any) {
-      toast.error(error.response?.data?.error || 'Registration failed');
+      toast.error(error.response?.data?.error || 'Registration failed. Please try again.');
     } finally {
       setSubmitting(false);
     }

@@ -2,24 +2,33 @@
 
 import { useState } from 'react';
 import { JobCard } from './JobCard';
-import { JobFilters } from './JobFilters';
+import { JobFilters, FilterState } from './JobFilters';
 import { EmptyState } from '@/components/shared/EmptyState';
-import { LoadingSpinner } from '@/components/shared/LoadingSpinner';
 import { Pagination } from '@/components/shared/Pagination';
-import { Briefcase, Filter } from 'lucide-react';
+import { Skeleton } from '@/components/ui/skeleton';
 import { Button } from '@/components/ui/button';
-import {
-  Sheet,
-  SheetContent,
-  SheetHeader,
-  SheetTitle,
-  SheetTrigger,
-} from '@/components/ui/sheet';
+import { Briefcase, LayoutGrid, List } from 'lucide-react';
+import { motion, AnimatePresence } from 'framer-motion';
+
+export interface JobItem {
+  id: string;
+  title: string;
+  description: string;
+  status: string;
+  category: string;
+  address: string;
+  pickup_address?: string;
+  dropoff_address?: string;
+  estimated_price: number;
+  created_at: string;
+  is_dispatch?: boolean;
+  customer?: { full_name: string };
+}
 
 interface JobListProps {
-  jobs: any[];
+  jobs: JobItem[];
   loading?: boolean;
-  onFilterChange?: (filters: any) => void;
+  onFilterChange?: (filters: FilterState) => void;
   onPageChange?: (page: number) => void;
   currentPage?: number;
   totalPages?: number;
@@ -28,7 +37,7 @@ interface JobListProps {
 }
 
 export function JobList({
-  jobs,
+  jobs = [],
   loading = false,
   onFilterChange,
   onPageChange,
@@ -37,84 +46,127 @@ export function JobList({
   totalItems = 0,
   categories = [],
 }: JobListProps) {
-  const [filters, setFilters] = useState({});
+  const [filterKey, setFilterKey] = useState(0);
+  const [viewMode, setViewMode] = useState<'list' | 'grid'>('list');
 
-  const handleFilterChange = (newFilters: any) => {
-    setFilters(newFilters);
+  const handleFilterChange = (newFilters: FilterState) => {
     onFilterChange?.(newFilters);
   };
 
-  if (loading) {
-    return <LoadingSpinner text="Loading jobs..." />;
-  }
-
-  if (jobs.length === 0) {
-    return (
-      <EmptyState
-        icon={Briefcase}
-        title="No jobs found"
-        description="Try adjusting your filters or check back later for new opportunities."
-        actionLabel="Clear Filters"
-        onAction={() => {
-          setFilters({});
-          onFilterChange?.({});
-        }}
-      />
-    );
-  }
+  const handleResetFilters = () => {
+    setFilterKey((prev) => prev + 1); // Triggers re-mount of JobFilters to reset state
+    onFilterChange?.({
+      search: '',
+      category: 'all',
+      status: 'all',
+      jobType: 'all',
+      minPrice: '',
+      maxPrice: '',
+    });
+  };
 
   return (
     <div className="space-y-6">
-      {/* Mobile Filter */}
-      <div className="md:hidden">
-        <Sheet>
-          <SheetTrigger asChild>
-            <Button variant="outline" className="w-full">
-              <Filter className="h-4 w-4 mr-2" />
-              Filters
-            </Button>
-          </SheetTrigger>
-          <SheetContent side="bottom" className="h-[80vh]">
-            <SheetHeader>
-              <SheetTitle>Filter Jobs</SheetTitle>
-            </SheetHeader>
-            <div className="py-4">
-              <JobFilters
-                onFilterChange={handleFilterChange}
-                categories={categories}
-              />
+      {/* Primary Filters (Unified for Mobile & Desktop) */}
+      <JobFilters
+        key={filterKey}
+        onFilterChange={handleFilterChange}
+        categories={categories}
+      />
+
+      {/* Control Bar: Results Count & Grid/List View Toggles */}
+      <div className="flex items-center justify-between text-xs md:text-sm text-muted-foreground pt-1">
+        <p>
+          {loading ? (
+            'Fetching available jobs...'
+          ) : (
+            <>
+              Showing <span className="font-bold text-foreground">{jobs.length}</span> of{' '}
+              <span className="font-bold text-foreground">{totalItems || jobs.length}</span> jobs
+            </>
+          )}
+        </p>
+
+        <div className="hidden sm:flex items-center gap-1 border border-border/60 rounded-lg p-0.5 bg-card">
+          <Button
+            variant={viewMode === 'list' ? 'secondary' : 'ghost'}
+            size="icon"
+            className="h-7 w-7"
+            onClick={() => setViewMode('list')}
+            title="List View"
+          >
+            <List className="h-3.5 w-3.5" />
+          </Button>
+          <Button
+            variant={viewMode === 'grid' ? 'secondary' : 'ghost'}
+            size="icon"
+            className="h-7 w-7"
+            onClick={() => setViewMode('grid')}
+            title="Grid View"
+          >
+            <LayoutGrid className="h-3.5 w-3.5" />
+          </Button>
+        </div>
+      </div>
+
+      {/* Loading Skeleton View */}
+      {loading ? (
+        <div className={viewMode === 'grid' ? 'grid grid-cols-1 md:grid-cols-2 gap-4' : 'space-y-4'}>
+          {[...Array(4)].map((_, i) => (
+            <div key={i} className="p-5 border border-border/60 bg-card rounded-xl space-y-3">
+              <div className="flex justify-between items-center">
+                <Skeleton className="h-5 w-1/3" />
+                <Skeleton className="h-5 w-20 rounded-full" />
+              </div>
+              <Skeleton className="h-4 w-3/4" />
+              <Skeleton className="h-4 w-1/2" />
+              <div className="flex justify-between pt-2">
+                <Skeleton className="h-6 w-24" />
+                <Skeleton className="h-4 w-20" />
+              </div>
             </div>
-          </SheetContent>
-        </Sheet>
-      </div>
-
-      {/* Desktop Filter */}
-      <div className="hidden md:block">
-        <JobFilters
-          onFilterChange={handleFilterChange}
-          categories={categories}
+          ))}
+        </div>
+      ) : jobs.length === 0 ? (
+        /* Empty State with persistent filter bar above */
+        <EmptyState
+          icon={Briefcase}
+          title="No jobs matching your criteria"
+          description="We couldn't find any listings matching your current filter selection. Try clearing search keywords or budget ranges."
+          actionLabel="Reset All Filters"
+          onAction={handleResetFilters}
         />
-      </div>
+      ) : (
+        /* Animated Cards Grid/List */
+        <AnimatePresence mode="wait">
+          <motion.div
+            key={currentPage}
+            initial={{ opacity: 0, y: 12 }}
+            animate={{ opacity: 1, y: 0 }}
+            exit={{ opacity: 0, y: -12 }}
+            transition={{ duration: 0.25 }}
+            className={
+              viewMode === 'grid'
+                ? 'grid grid-cols-1 md:grid-cols-2 gap-4'
+                : 'space-y-4'
+            }
+          >
+            {jobs.map((job) => (
+              <JobCard key={job.id} job={job} />
+            ))}
+          </motion.div>
+        </AnimatePresence>
+      )}
 
-      {/* Results Count */}
-      <p className="text-sm text-muted-foreground">
-        Showing {jobs.length} of {totalItems} jobs
-      </p>
-
-      {/* Job Cards */}
-      <div className="grid gap-4">
-        {jobs.map((job) => (
-          <JobCard key={job.id} job={job} />
-        ))}
-      </div>
-
-      {/* Pagination */}
-      {totalPages > 1 && (
-        <Pagination
-          currentPage={currentPage}
-          totalPages={totalPages}
-          onPageChange={onPageChange || (() => {})}
-        />
+      {/* Pagination Controls */}
+      {!loading && totalPages > 1 && (
+        <div className="pt-4 border-t border-border/40 flex justify-center">
+          <Pagination
+            currentPage={currentPage}
+            totalPages={totalPages}
+            onPageChange={onPageChange || (() => {})}
+          />
+        </div>
       )}
     </div>
   );

@@ -1,9 +1,9 @@
 'use client';
 
-import { useState, useRef, useCallback } from 'react';
+import { useState, useRef, useCallback, useEffect } from 'react';
 import { toast } from 'sonner';
 
-interface CameraOptions {
+export interface CameraOptions {
   facingMode?: 'user' | 'environment';
   quality?: number;
   maxWidth?: number;
@@ -12,94 +12,175 @@ interface CameraOptions {
 
 export function useCamera(options: CameraOptions = {}) {
   const {
-    facingMode = 'environment',
+    facingMode: initialFacingMode = 'environment',
     quality = 0.8,
     maxWidth = 1920,
     maxHeight = 1080,
   } = options;
 
   const [stream, setStream] = useState<MediaStream | null>(null);
-  const [loading, setLoading] = useState(false);
+  const [loading, setLoading] = useState<boolean>(false);
   const [error, setError] = useState<string | null>(null);
   const [image, setImage] = useState<string | null>(null);
-  const videoRef = useRef<HTMLVideoElement>(null);
-  const canvasRef = useRef<HTMLCanvasElement>(null);
+  const [currentFacingMode, setCurrentFacingMode] = useState<'user' | 'environment'>(
+    initialFacingMode
+  );
 
-  const startCamera = useCallback(async () => {
-    try {
-      setLoading(true);
-      setError(null);
-      
-      const mediaStream = await navigator.mediaDevices.getUserMedia({
-        video: {
-          facingMode,
-          width: { ideal: maxWidth },
-          height: { ideal: maxHeight },
-        },
-        audio: false,
-      });
+  const videoRef = useRef<HTMLVideoElement | null>(null);
+  const canvasRef = useRef<HTMLCanvasElement | null>(null);
+  const streamRef = useRef<MediaStream | null>(null);
 
-      setStream(mediaStream);
-      if (videoRef.current) {
-        videoRef.current.srcObject = mediaStream;
-        await videoRef.current.play();
-      }
-      
-      return mediaStream;
-    } catch (error) {
-      const message = error instanceof Error ? error.message : 'Failed to access camera';
-      setError(message);
-      toast.error('Camera access denied. Please allow camera permissions.');
-      return null;
-    } finally {
-      setLoading(false);
-    }
-  }, [facingMode, maxWidth, maxHeight]);
+  // Sync streamRef to state for stale-closure free teardown
+  useEffect(() => {
+    streamRef.current = stream;
+  }, [stream]);
 
   const stopCamera = useCallback(() => {
-    if (stream) {
-      stream.getTracks().forEach(track => track.stop());
+    if (streamRef.current) {
+      streamRef.current.getTracks().forEach((track) => track.stop());
+      streamRef.current = null;
       setStream(null);
     }
     if (videoRef.current) {
       videoRef.current.srcObject = null;
     }
-  }, [stream]);
+  }, []);
+
+  // Ensure camera shuts off if the component unmounts
+  useEffect(() => {
+    return () => {
+      stopCamera();
+    };
+  }, [stopCamera]);
+
+  const startCamera = useCallback(
+    async (overrideFacingMode?: 'user' | 'environment'): Promise<MediaStream | null> => {
+      stopCamera();
+
+      if (typeof window === 'undefined' || !navigator.mediaDevices?.getUserMedia) {
+        const msg = 'Media Devices API is not supported in this environment';
+        setError(msg);
+        toast.error('Camera API not supported on this device');
+        return null;
+      }
+
+      const targetFacingMode = overrideFacingMode || currentFacingMode;
+
+      try {
+        setLoading(true);
+        setError(null);
+
+        const mediaStream = await navigator.mediaDevices.getUserMedia({
+          video: {
+            facingMode: { ideal: targetFacingMode },
+            width: { ideal: maxWidth },
+            height: { ideal: maxHeight },
+          },
+          audio: false,
+        });
+
+        setStream(mediaStream);
+        setCurrentFacingMode(targetFacingMode);
+
+        if (videoRef.current) {
+          videoRef.current.srcObject = mediaStream;
+          await videoRef.current.play().catch((playErr) => {
+            console.warn('Autoplay prevented or interrupted:', playErr);
+          });
+        }
+
+        return mediaStream;
+      } catch (err: any) {
+        const message =
+          err instanceof Error
+            ? err.message
+            : 'Failed to access camera. Please check permissions.';
+        setError(message);
+        toast.error('Camera access failed', { description: 'Please check app permissions.' });
+        return null;
+      } finally {
+        setLoading(false);
+      }
+    },
+    [currentFacingMode, maxWidth, maxHeight, stopCamera]
+  );
+
+  const switchCamera = useCallback(async (): Promise<'user' | 'environment'> => {
+    const nextFacingMode = currentFacingMode === 'user' ? 'environment' : 'user';
+    await startCamera(nextFacingMode);
+    return nextFacingMode;
+  }, [currentFacingMode, startCamera]);
 
   const capturePhoto = useCallback((): string | null => {
-    if (!videoRef.current || !canvasRef.current) {
-      toast.error('Camera not ready');
+    if (!videoRef.current) {
+      toast.error('Camera stream is not ready');
       return null;
     }
 
     const video = videoRef.current;
-    const canvas = canvasRef.current;
+    if (video.readyState < 2) {
+      toast.error('Video feed loading...');
+      return null;
+    }
+
+    // Dynamic canvas fallback or creation if not assigned in DOM
+    const canvas = canvasRef.current || document.createElement('canvas');
     const context = canvas.getContext('2d');
 
     if (!context) {
-      toast.error('Failed to capture image');
+      toast.error('Failed to initialize image context');
       return null;
     }
 
     canvas.width = video.videoWidth || maxWidth;
     canvas.height = video.videoHeight || maxHeight;
+
+    // Handle horizontal mirror flip for front camera
+    if (currentFacingMode === 'user') {
+      context.translate(canvas.width, 0);
+      context.scale(-1, 1);
+    }
+
     context.drawImage(video, 0, 0, canvas.width, canvas.height);
 
     const imageData = canvas.toDataURL('image/jpeg', quality);
     setImage(imageData);
     return imageData;
-  }, [maxWidth, maxHeight, quality]);
+  }, [maxWidth, maxHeight, quality, currentFacingMode]);
+
+  const captureBlob = useCallback(async (): Promise<Blob | null> => {
+    if (!videoRef.current) return null;
+
+    const video = videoRef.current;
+    const canvas = canvasRef.current || document.createElement('canvas');
+    const context = canvas.getContext('2d');
+
+    if (!context) return null;
+
+    canvas.width = video.videoWidth || maxWidth;
+    canvas.height = video.videoHeight || maxHeight;
+
+    if (currentFacingMode === 'user') {
+      context.translate(canvas.width, 0);
+      context.scale(-1, 1);
+    }
+
+    context.drawImage(video, 0, 0, canvas.width, canvas.height);
+
+    return new Promise((resolve) => {
+      canvas.toBlob(
+        (blob) => {
+          resolve(blob);
+        },
+        'image/jpeg',
+        quality
+      );
+    });
+  }, [maxWidth, maxHeight, quality, currentFacingMode]);
 
   const resetImage = useCallback(() => {
     setImage(null);
   }, []);
-
-  const switchCamera = useCallback(async () => {
-    const newFacingMode = facingMode === 'user' ? 'environment' : 'user';
-    stopCamera();
-    await startCamera();
-    return newFacingMode;
-  }, [facingMode, startCamera, stopCamera]);
 
   return {
     videoRef,
@@ -108,10 +189,12 @@ export function useCamera(options: CameraOptions = {}) {
     loading,
     error,
     image,
+    facingMode: currentFacingMode,
     startCamera,
     stopCamera,
-    capturePhoto,
-    resetImage,
     switchCamera,
+    capturePhoto,
+    captureBlob,
+    resetImage,
   };
 }

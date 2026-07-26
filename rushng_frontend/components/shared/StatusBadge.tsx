@@ -1,15 +1,19 @@
 'use client';
 
+import React from 'react';
 import { cn } from '@/lib/utils';
-import { 
-  CheckCircle2, 
-  Clock, 
-  XCircle, 
-  AlertCircle, 
+import {
+  CheckCircle2,
+  Clock,
+  XCircle,
+  AlertCircle,
   Loader2,
   Shield,
   Check,
   Ban,
+  Truck,
+  PackageCheck,
+  AlertTriangle,
 } from 'lucide-react';
 
 interface StatusBadgeProps {
@@ -19,135 +23,198 @@ interface StatusBadgeProps {
   showIcon?: boolean;
 }
 
-const STATUS_CONFIGS: Record<string, { label: string; className: string; icon: React.ReactNode }> = {
-  // Job statuses
-  posted: { 
-    label: 'Open', 
-    className: 'bg-blue-100 text-blue-700',
-    icon: <Clock className="h-3 w-3" />
+interface StatusConfig {
+  label: string;
+  className: string;
+  icon: (iconSize: string) => React.ReactNode;
+}
+
+const STATUS_CONFIGS: Record<string, StatusConfig> = {
+  // Job & Order Statuses
+  posted: {
+    label: 'Open',
+    className:
+      'bg-blue-50 text-blue-700 border-blue-200 dark:bg-blue-950/50 dark:text-blue-400 dark:border-blue-900',
+    icon: (s) => <Clock className={s} />,
   },
-  assigned: { 
-    label: 'Assigned', 
-    className: 'bg-yellow-100 text-yellow-700',
-    icon: <Loader2 className="h-3 w-3" />
+  assigned: {
+    label: 'Assigned',
+    className:
+      'bg-amber-50 text-amber-700 border-amber-200 dark:bg-amber-950/50 dark:text-amber-400 dark:border-amber-900',
+    icon: (s) => <Loader2 className={s} />,
   },
-  in_progress: { 
-    label: 'In Progress', 
-    className: 'bg-orange-100 text-orange-700',
-    icon: <Loader2 className="h-3 w-3 animate-spin" />
+  in_progress: {
+    label: 'In Progress',
+    className:
+      'bg-orange-50 text-orange-700 border-orange-200 dark:bg-orange-950/50 dark:text-orange-400 dark:border-orange-900',
+    icon: (s) => <Loader2 className={cn(s, 'animate-spin')} />,
   },
-  completed: { 
-    label: 'Completed', 
-    className: 'bg-green-100 text-green-700',
-    icon: <CheckCircle2 className="h-3 w-3" />
+  picked_up: {
+    label: 'Picked Up',
+    className:
+      'bg-sky-50 text-sky-700 border-sky-200 dark:bg-sky-950/50 dark:text-sky-400 dark:border-sky-900',
+    icon: (s) => <PackageCheck className={s} />,
   },
-  cancelled: { 
-    label: 'Cancelled', 
-    className: 'bg-red-100 text-red-700',
-    icon: <XCircle className="h-3 w-3" />
+  out_for_delivery: {
+    label: 'Out for Delivery',
+    className:
+      'bg-indigo-50 text-indigo-700 border-indigo-200 dark:bg-indigo-950/50 dark:text-indigo-400 dark:border-indigo-900',
+    icon: (s) => <Truck className={s} />,
   },
-  
-  // Payment statuses
-  pending: { 
-    label: 'Pending', 
-    className: 'bg-yellow-100 text-yellow-700',
-    icon: <Clock className="h-3 w-3" />
+  completed: {
+    label: 'Completed',
+    className:
+      'bg-emerald-50 text-emerald-700 border-emerald-200 dark:bg-emerald-950/50 dark:text-emerald-400 dark:border-emerald-900',
+    icon: (s) => <CheckCircle2 className={s} />,
   },
-  held: { 
-    label: 'Held', 
-    className: 'bg-blue-100 text-blue-700',
-    icon: <Shield className="h-3 w-3" />
+  cancelled: {
+    label: 'Cancelled',
+    className:
+      'bg-rose-50 text-rose-700 border-rose-200 dark:bg-rose-950/50 dark:text-rose-400 dark:border-rose-900',
+    icon: (s) => <XCircle className={s} />,
   },
-  released: { 
-    label: 'Released', 
-    className: 'bg-green-100 text-green-700',
-    icon: <CheckCircle2 className="h-3 w-3" />
-  },
-  failed: { 
-    label: 'Failed', 
-    className: 'bg-red-100 text-red-700',
-    icon: <XCircle className="h-3 w-3" />
-  },
-  refunded: { 
-    label: 'Refunded', 
-    className: 'bg-purple-100 text-purple-700',
-    icon: <AlertCircle className="h-3 w-3" />
+  delayed: {
+    label: 'Delayed',
+    className:
+      'bg-amber-50 text-amber-700 border-amber-200 dark:bg-amber-950/50 dark:text-amber-400 dark:border-amber-900',
+    icon: (s) => <AlertTriangle className={s} />,
   },
 
-  // Provider statuses
-  verified: { 
-    label: 'Verified', 
-    className: 'bg-green-100 text-green-700',
-    icon: <Check className="h-3 w-3" />
+  // Payment Statuses
+  pending: {
+    label: 'Pending',
+    className:
+      'bg-amber-50 text-amber-700 border-amber-200 dark:bg-amber-950/50 dark:text-amber-400 dark:border-amber-900',
+    icon: (s) => <Clock className={s} />,
   },
-  unverified: { 
-    label: 'Unverified', 
-    className: 'bg-gray-100 text-gray-700',
-    icon: <AlertCircle className="h-3 w-3" />
+  held: {
+    label: 'Held',
+    className:
+      'bg-blue-50 text-blue-700 border-blue-200 dark:bg-blue-950/50 dark:text-blue-400 dark:border-blue-900',
+    icon: (s) => <Shield className={s} />,
   },
-  suspended: { 
-    label: 'Suspended', 
-    className: 'bg-red-100 text-red-700',
-    icon: <Ban className="h-3 w-3" />
+  released: {
+    label: 'Released',
+    className:
+      'bg-emerald-50 text-emerald-700 border-emerald-200 dark:bg-emerald-950/50 dark:text-emerald-400 dark:border-emerald-900',
+    icon: (s) => <CheckCircle2 className={s} />,
+  },
+  failed: {
+    label: 'Failed',
+    className:
+      'bg-rose-50 text-rose-700 border-rose-200 dark:bg-rose-950/50 dark:text-rose-400 dark:border-rose-900',
+    icon: (s) => <XCircle className={s} />,
+  },
+  refunded: {
+    label: 'Refunded',
+    className:
+      'bg-purple-50 text-purple-700 border-purple-200 dark:bg-purple-950/50 dark:text-purple-400 dark:border-purple-900',
+    icon: (s) => <AlertCircle className={s} />,
   },
 
-  // Violation statuses
-  pending_review: { 
-    label: 'Pending Review', 
-    className: 'bg-yellow-100 text-yellow-700',
-    icon: <Clock className="h-3 w-3" />
+  // Account & Provider Verification
+  verified: {
+    label: 'Verified',
+    className:
+      'bg-emerald-50 text-emerald-700 border-emerald-200 dark:bg-emerald-950/50 dark:text-emerald-400 dark:border-emerald-900',
+    icon: (s) => <Check className={s} />,
   },
-  confirmed: { 
-    label: 'Confirmed', 
-    className: 'bg-red-100 text-red-700',
-    icon: <AlertCircle className="h-3 w-3" />
+  unverified: {
+    label: 'Unverified',
+    className:
+      'bg-slate-100 text-slate-700 border-slate-200 dark:bg-slate-800 dark:text-slate-300 dark:border-slate-700',
+    icon: (s) => <AlertCircle className={s} />,
   },
-  dismissed: { 
-    label: 'Dismissed', 
-    className: 'bg-green-100 text-green-700',
-    icon: <CheckCircle2 className="h-3 w-3" />
+  suspended: {
+    label: 'Suspended',
+    className:
+      'bg-rose-50 text-rose-700 border-rose-200 dark:bg-rose-950/50 dark:text-rose-400 dark:border-rose-900',
+    icon: (s) => <Ban className={s} />,
   },
-  appealed: { 
-    label: 'Appealed', 
-    className: 'bg-purple-100 text-purple-700',
-    icon: <Shield className="h-3 w-3" />
+
+  // Violation / Incident Tracking
+  pending_review: {
+    label: 'Pending Review',
+    className:
+      'bg-amber-50 text-amber-700 border-amber-200 dark:bg-amber-950/50 dark:text-amber-400 dark:border-amber-900',
+    icon: (s) => <Clock className={s} />,
   },
-  resolved: { 
-    label: 'Resolved', 
-    className: 'bg-green-100 text-green-700',
-    icon: <CheckCircle2 className="h-3 w-3" />
+  confirmed: {
+    label: 'Confirmed',
+    className:
+      'bg-rose-50 text-rose-700 border-rose-200 dark:bg-rose-950/50 dark:text-rose-400 dark:border-rose-900',
+    icon: (s) => <AlertCircle className={s} />,
+  },
+  dismissed: {
+    label: 'Dismissed',
+    className:
+      'bg-emerald-50 text-emerald-700 border-emerald-200 dark:bg-emerald-950/50 dark:text-emerald-400 dark:border-emerald-900',
+    icon: (s) => <CheckCircle2 className={s} />,
+  },
+  appealed: {
+    label: 'Appealed',
+    className:
+      'bg-purple-50 text-purple-700 border-purple-200 dark:bg-purple-950/50 dark:text-purple-400 dark:border-purple-900',
+    icon: (s) => <Shield className={s} />,
+  },
+  resolved: {
+    label: 'Resolved',
+    className:
+      'bg-emerald-50 text-emerald-700 border-emerald-200 dark:bg-emerald-950/50 dark:text-emerald-400 dark:border-emerald-900',
+    icon: (s) => <CheckCircle2 className={s} />,
   },
 };
 
-export function StatusBadge({ status, className, size = 'md', showIcon = true }: StatusBadgeProps) {
-  const config = STATUS_CONFIGS[status];
-  
+export function StatusBadge({
+  status,
+  className,
+  size = 'md',
+  showIcon = true,
+}: StatusBadgeProps) {
+  const normalizedKey = status ? status.toLowerCase().trim() : '';
+  const config = STATUS_CONFIGS[normalizedKey];
+
+  const sizeClasses = {
+    sm: 'text-[11px] px-2 py-0.5 gap-1 font-medium',
+    md: 'text-xs px-2.5 py-1 gap-1.5 font-semibold',
+    lg: 'text-sm px-3.5 py-1.5 gap-2 font-semibold',
+  };
+
+  const iconSizeClasses = {
+    sm: 'h-3 w-3',
+    md: 'h-3.5 w-3.5',
+    lg: 'h-4 w-4',
+  };
+
   if (!config) {
+    const formattedFallback = status
+      ? status.replace(/_/g, ' ').toUpperCase()
+      : 'UNKNOWN';
+
     return (
-      <span className={cn(
-        'inline-flex items-center rounded-full bg-gray-100 px-2 py-0.5 text-xs font-medium text-gray-700',
-        className
-      )}>
-        {status.replace('_', ' ').toUpperCase()}
+      <span
+        className={cn(
+          'inline-flex items-center rounded-full border border-slate-200 bg-slate-100 text-slate-700 dark:border-slate-800 dark:bg-slate-800 dark:text-slate-300',
+          sizeClasses[size],
+          className
+        )}
+      >
+        {formattedFallback}
       </span>
     );
   }
 
-  const sizeClasses = {
-    sm: 'text-xs px-2 py-0.5 gap-1',
-    md: 'text-sm px-3 py-1 gap-1.5',
-    lg: 'text-base px-4 py-1.5 gap-2',
-  };
-
   return (
-    <span className={cn(
-      'inline-flex items-center rounded-full font-medium',
-      config.className,
-      sizeClasses[size],
-      className
-    )}>
-      {showIcon && config.icon}
-      {config.label}
+    <span
+      className={cn(
+        'inline-flex items-center rounded-full border shrink-0 transition-colors',
+        config.className,
+        sizeClasses[size],
+        className
+      )}
+    >
+      {showIcon && config.icon(iconSizeClasses[size])}
+      <span>{config.label}</span>
     </span>
   );
 }

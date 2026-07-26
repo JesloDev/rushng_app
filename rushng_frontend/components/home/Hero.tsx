@@ -1,139 +1,164 @@
 'use client';
 
 import { Button } from '@/components/ui/button';
-import { ArrowRight, Star, Users, Briefcase, CheckCircle } from 'lucide-react';
+import { ArrowRight, Star, Briefcase, CheckCircle2 } from 'lucide-react';
 import Link from 'next/link';
 import { motion } from 'framer-motion';
 
 export function Hero() {
+  const sampleProviders = [
+    { name: 'Chidi E.', service: 'Plumbing & Dispatch', rating: 4.9, distance: '2.3km' },
+    { name: 'Amina B.', service: 'Electrical Maintenance', rating: 4.8, distance: '3.1km' },
+    { name: 'Tunde O.', service: 'Carpentry & Logistics', rating: 4.7, distance: '1.8km' },
+  ];
+
   return (
-    <section className="relative overflow-hidden bg-gradient-to-b from-orange-50 to-white pt-20 pb-32">
-      {/* Background decoration */}
-      <div className="absolute inset-0 -z-10">
-        <div className="absolute top-0 right-0 h-[500px] w-[500px] rounded-full bg-orange-100/30 blur-3xl" />
-        <div className="absolute bottom-0 left-0 h-[400px] w-[400px] rounded-full bg-amber-100/20 blur-3xl" />
+    <section className="relative overflow-hidden bg-gradient-to-b from-primary/5 via-background to-background pt-16 md:pt-24 pb-24 md:pb-32">
+      {/* Background Glow Decorations */}
+      <div className="absolute inset-0 -z-10 overflow-hidden" aria-hidden="true">
+        <div className="absolute -top-24 -right-24 h-[500px] w-[500px] rounded-full bg-primary/10 blur-3xl pointer-events-none" />
+        <div className="absolute top-1/2 -left-24 h-[400px] w-[400px] rounded-full bg-amber-500/10 blur-3xl pointer-events-none" />
       </div>
 
-      <div className="container mx-auto px-4">
-        <div className="grid lg:grid-cols-2 gap-12 items-center">
-          {/* Left Content */}
+      <div className="container mx-auto px-4 md:px-6">
+        <div className="grid lg:grid-cols-2 gap-12 lg:gap-8 items-center">
+          
+          {/* Left Hero Content */}
           <motion.div
             initial={{ opacity: 0, y: 20 }}
             animate={{ opacity: 1, y: 0 }}
             transition={{ duration: 0.5 }}
+            className="space-y-6 text-left"
           >
-            <div className="inline-flex items-center gap-2 rounded-full bg-orange-100 px-4 py-1.5 text-sm font-medium text-orange-700 mb-6">
+            {/* Live Availability Badge */}
+           {/* <div className="inline-flex items-center gap-2 rounded-full border border-primary/20 bg-primary/10 px-4 py-1.5 text-xs md:text-sm font-semibold text-primary">
               <span className="relative flex h-2 w-2">
-                <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-orange-400 opacity-75" />
-                <span className="relative inline-flex rounded-full h-2 w-2 bg-orange-500" />
+                <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-primary opacity-75" />
+                <span className="relative inline-flex rounded-full h-2 w-2 bg-primary" />
               </span>
-              Available 24/7 across Nigeria
-            </div>
+              Available 24/7 Across Nigeria
+            </div>*/}
 
-            <h1 className="text-5xl md:text-6xl font-bold leading-tight mb-6">
+            {/* Headline */}
+            <h1 className="text-4xl md:text-6xl font-extrabold tracking-tight leading-[1.15]">
               Find Trusted{' '}
-              <span className="gradient-text">Service Providers</span>{' '}
-              Near You
+              <span className="bg-gradient-to-r from-orange-500 via-amber-500 to-amber-600 bg-clip-text text-transparent">
+                Service Providers
+              </span>{' '}
+              & Logistics Near You
             </h1>
 
-            <p className="text-lg text-gray-600 mb-8 max-w-lg">
-              Connect with verified plumbers, electricians, carpenters, and more. 
-              Get quality service from trusted professionals in your area.
+            {/* Description */}
+            <p className="text-base md:text-lg text-muted-foreground max-w-xl leading-relaxed">
+              Connect with verified dispatch riders, plumbers, electricians, and technicians. 
+              Get quality, reliable service delivered straight to your doorstep.
             </p>
 
-            <div className="flex flex-wrap gap-4">
-              <Link href="/jobs">
-                <Button size="lg" className="gradient-rush text-white shadow-rush hover:shadow-rush-hover">
+            {/* Action Buttons */}
+            <div className="flex flex-wrap items-center gap-4 pt-2">
+              <Button 
+                asChild 
+                size="lg" 
+                className="gradient-rush text-white font-semibold shadow-rush hover:opacity-95 h-12 px-6"
+              >
+                <Link href="/jobs" className="flex items-center gap-2">
                   Find a Service
-                  <ArrowRight className="ml-2 h-4 w-4" />
-                </Button>
-              </Link>
-              <Link href="/providers/register">
-                <Button size="lg" variant="outline" className="border-orange-200 hover:bg-orange-50">
+                  <ArrowRight className="h-4 w-4" />
+                </Link>
+              </Button>
+
+              <Button 
+                asChild 
+                size="lg" 
+                variant="outline" 
+                className="h-12 px-6 border-border hover:bg-accent font-medium"
+              >
+                <Link href="/providers/register">
                   Become a Provider
-                </Button>
-              </Link>
+                </Link>
+              </Button>
             </div>
 
-            {/* Stats */}
-            <div className="flex gap-8 mt-10">
+            {/* Social Proof / Key Metrics */}
+            <div className="grid grid-cols-3 gap-4 pt-8 border-t border-border/60">
               <div>
-                <div className="text-2xl font-bold text-orange-500">10K+</div>
-                <div className="text-sm text-gray-500">Active Providers</div>
+                <div className="text-2xl md:text-3xl font-bold tracking-tight text-primary">10K+</div>
+                <div className="text-xs md:text-sm text-muted-foreground font-medium">Verified Providers</div>
               </div>
               <div>
-                <div className="text-2xl font-bold text-orange-500">50K+</div>
-                <div className="text-sm text-gray-500">Jobs Completed</div>
+                <div className="text-2xl md:text-3xl font-bold tracking-tight text-primary">50K+</div>
+                <div className="text-xs md:text-sm text-muted-foreground font-medium">Jobs Delivered</div>
               </div>
               <div>
-                <div className="text-2xl font-bold text-orange-500">4.8★</div>
-                <div className="text-sm text-gray-500">Average Rating</div>
+                <div className="text-2xl md:text-3xl font-bold tracking-tight text-primary">4.8★</div>
+                <div className="text-xs md:text-sm text-muted-foreground font-medium">Average Rating</div>
               </div>
             </div>
           </motion.div>
 
-          {/* Right Content */}
+          {/* Right Live Preview Card */}
           <motion.div
             initial={{ opacity: 0, x: 20 }}
             animate={{ opacity: 1, x: 0 }}
             transition={{ duration: 0.5, delay: 0.2 }}
-            className="relative"
+            className="relative lg:ml-auto w-full max-w-md lg:max-w-none"
           >
-            <div className="relative rounded-2xl overflow-hidden shadow-2xl">
-              <div className="bg-gradient-to-br from-orange-500 to-amber-600 p-8 text-white">
+            <div className="relative rounded-2xl overflow-hidden shadow-2xl border border-border/50">
+              <div className="gradient-rush p-6 md:p-8 text-white">
                 <div className="flex items-center gap-3 mb-6">
-                  <div className="flex h-12 w-12 items-center justify-center rounded-full bg-white/20 backdrop-blur">
-                    <Briefcase className="h-6 w-6" />
+                  <div className="flex h-12 w-12 items-center justify-center rounded-xl bg-white/20 backdrop-blur-md shrink-0">
+                    <Briefcase className="h-6 w-6 text-white" />
                   </div>
                   <div>
-                    <h3 className="font-semibold">Find a Professional</h3>
-                    <p className="text-sm text-white/80">Near your location</p>
+                    <h3 className="font-bold text-lg leading-tight">Nearby Professionals</h3>
+                    <p className="text-xs text-white/80">Active now in your area</p>
                   </div>
                 </div>
 
-                <div className="space-y-4">
-                  {[
-                    { name: 'Chidi E.', service: 'Plumbing', rating: 4.9, distance: '2.3km' },
-                    { name: 'Amina B.', service: 'Electrical', rating: 4.8, distance: '3.1km' },
-                    { name: 'Tunde O.', service: 'Carpentry', rating: 4.7, distance: '1.8km' },
-                  ].map((provider, i) => (
+                {/* Provider List Stack */}
+                <div className="space-y-3">
+                  {sampleProviders.map((provider, index) => (
                     <div
-                      key={i}
-                      className="flex items-center justify-between rounded-lg bg-white/10 backdrop-blur p-3 hover:bg-white/20 transition"
+                      key={index}
+                      className="flex items-center justify-between rounded-xl bg-white/10 backdrop-blur-md p-3.5 border border-white/10 hover:bg-white/20 transition-all cursor-pointer"
                     >
-                      <div>
-                        <p className="font-medium">{provider.name}</p>
-                        <p className="text-sm text-white/70">{provider.service}</p>
+                      <div className="space-y-0.5">
+                        <p className="font-semibold text-sm leading-tight">{provider.name}</p>
+                        <p className="text-xs text-white/80">{provider.service}</p>
                       </div>
                       <div className="text-right">
-                        <div className="flex items-center gap-1 text-sm">
-                          <Star className="h-3 w-3 fill-yellow-400 text-yellow-400" />
+                        <div className="flex items-center justify-end gap-1 text-xs font-semibold">
+                          <Star className="h-3.5 w-3.5 fill-amber-300 text-amber-300" />
                           <span>{provider.rating}</span>
                         </div>
-                        <p className="text-xs text-white/60">{provider.distance}</p>
+                        <p className="text-[11px] text-white/70 mt-0.5">{provider.distance}</p>
                       </div>
                     </div>
                   ))}
                 </div>
 
-                <div className="mt-4 text-center text-sm text-white/70">
-                  Join thousands of satisfied customers
-                </div>
+                <p className="mt-6 text-center text-xs font-medium text-white/80">
+                  Trusted by thousands of customers daily
+                </p>
               </div>
             </div>
 
-            {/* Floating badges */}
+            {/* Animated Floating Status Badge */}
             <motion.div
-              animate={{ y: [-5, 5, -5] }}
-              transition={{ duration: 3, repeat: Infinity }}
-              className="absolute -top-4 -right-4 rounded-lg bg-white p-3 shadow-lg"
+              animate={{ y: [-6, 6, -6] }}
+              transition={{ duration: 4, repeat: Infinity, ease: 'easeInOut' }}
+              className="absolute -top-4 -right-2 md:-right-4 rounded-xl bg-card border border-border p-3 shadow-xl backdrop-blur-md hidden sm:block"
             >
-              <div className="flex items-center gap-2">
-                <CheckCircle className="h-5 w-5 text-green-500" />
-                <span className="text-sm font-medium">100% Verified</span>
+              <div className="flex items-center gap-2.5">
+                <CheckCircle2 className="h-5 w-5 text-emerald-500" />
+                <div>
+                  <p className="text-xs font-bold text-foreground leading-none">100% Verified</p>
+                  <p className="text-[10px] text-muted-foreground mt-0.5">NIN & Identity Checked</p>
+                </div>
               </div>
             </motion.div>
           </motion.div>
+
         </div>
       </div>
     </section>

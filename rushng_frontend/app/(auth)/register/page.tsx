@@ -8,18 +8,19 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
-import { Loader2, Eye, EyeOff, AlertCircle, CheckCircle2, ArrowLeft, Zap, Mail, Phone, User, Lock, UserPlus } from 'lucide-react';
+import { Loader2, Eye, EyeOff, AlertCircle, CheckCircle2, ArrowLeft, Mail, Phone, User, Lock, UserPlus } from 'lucide-react';
 import { toast } from 'sonner';
 import { motion } from 'framer-motion';
 
 export default function RegisterPage() {
   const router = useRouter();
-  const { register, loading, isAuthenticated } = useAuth();
+  const { register, loading, isAuthenticated, error: authError, clearError } = useAuth();
+
   const [showPassword, setShowPassword] = useState(false);
   const [showConfirmPassword, setShowConfirmPassword] = useState(false);
-  const [isSubmitting, setIsSubmitting] = useState(false);
-  const [error, setError] = useState<string | null>(null);
+  const [localError, setLocalError] = useState<string | null>(null);
   const [passwordStrength, setPasswordStrength] = useState({ score: 0, label: '', color: '', bgColor: '' });
+  
   const [formData, setFormData] = useState({
     full_name: '',
     email: '',
@@ -50,11 +51,14 @@ export default function RegisterPage() {
         { label: 'Strong', color: 'text-green-500', bgColor: 'bg-green-500' },
         { label: 'Very Strong', color: 'text-emerald-500', bgColor: 'bg-emerald-500' },
       ];
+
+      const safeScore = Math.min(Math.max(score, 0), strengthMap.length - 1);
+
       return {
-        score,
-        label: strengthMap[score].label,
-        color: strengthMap[score].color,
-        bgColor: strengthMap[score].bgColor,
+        score: safeScore,
+        label: strengthMap[safeScore].label,
+        color: strengthMap[safeScore].color,
+        bgColor: strengthMap[safeScore].bgColor,
       };
     };
 
@@ -67,38 +71,33 @@ export default function RegisterPage() {
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    setError(null);
-    setIsSubmitting(true);
+    setLocalError(null);
+    if (clearError) clearError();
 
     if (!formData.full_name || !formData.email || !formData.phone || !formData.password) {
-      setError('Please fill in all fields');
-      setIsSubmitting(false);
+      setLocalError('Please fill in all fields');
       return;
     }
 
     if (formData.password !== formData.confirm_password) {
-      setError('Passwords do not match');
-      setIsSubmitting(false);
+      setLocalError('Passwords do not match');
       return;
     }
 
     if (formData.password.length < 8) {
-      setError('Password must be at least 8 characters');
-      setIsSubmitting(false);
+      setLocalError('Password must be at least 8 characters');
       return;
     }
 
     const phoneRegex = /^(\+234|0)[789][01]\d{8}$/;
     if (!phoneRegex.test(formData.phone)) {
-      setError('Please enter a valid Nigerian phone number (e.g., 08012345678)');
-      setIsSubmitting(false);
+      setLocalError('Please enter a valid Nigerian phone number (e.g., 08012345678)');
       return;
     }
 
     const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
     if (!emailRegex.test(formData.email)) {
-      setError('Please enter a valid email address');
-      setIsSubmitting(false);
+      setLocalError('Please enter a valid email address');
       return;
     }
 
@@ -114,15 +113,14 @@ export default function RegisterPage() {
       if (success) {
         toast.success('Account created! Please verify your email.');
         router.push('/verify');
-      } else {
-        setError('Registration failed. Please try again.');
       }
     } catch (err: any) {
-      setError(err.message || 'Something went wrong. Please try again.');
-    } finally {
-      setIsSubmitting(false);
+      setLocalError(err.message || 'Something went wrong. Please try again.');
     }
   };
+
+  const displayedError = localError || authError?.message;
+  const isPending = loading;
 
   return (
     <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-orange-50 via-white to-orange-50/30 py-12 px-4 sm:px-6 lg:px-8">
@@ -158,14 +156,14 @@ export default function RegisterPage() {
           </CardHeader>
           <CardContent>
             <form onSubmit={handleSubmit} className="space-y-4">
-              {error && (
+              {displayedError && (
                 <motion.div
                   initial={{ opacity: 0, y: -10 }}
                   animate={{ opacity: 1, y: 0 }}
                   className="flex items-center gap-2 rounded-lg border border-red-200 bg-red-50 p-3 text-sm text-red-800"
                 >
                   <AlertCircle className="h-4 w-4 shrink-0" />
-                  <span>{error}</span>
+                  <span>{displayedError}</span>
                 </motion.div>
               )}
 
@@ -179,7 +177,7 @@ export default function RegisterPage() {
                     value={formData.full_name}
                     onChange={(e) => setFormData({ ...formData, full_name: e.target.value })}
                     required
-                    disabled={isSubmitting}
+                    disabled={isPending}
                     className="h-12 pl-10 border-gray-200 focus:border-orange-500 focus:ring-orange-500"
                   />
                 </div>
@@ -196,7 +194,7 @@ export default function RegisterPage() {
                     value={formData.email}
                     onChange={(e) => setFormData({ ...formData, email: e.target.value })}
                     required
-                    disabled={isSubmitting}
+                    disabled={isPending}
                     className="h-12 pl-10 border-gray-200 focus:border-orange-500 focus:ring-orange-500"
                   />
                 </div>
@@ -209,11 +207,11 @@ export default function RegisterPage() {
                   <Input
                     id="phone"
                     type="tel"
-                    placeholder="Enter your phone number (e.g., 08012345678 or +2348012345678)"
+                    placeholder="Enter your phone number (e.g., 08012345678)"
                     value={formData.phone}
                     onChange={(e) => setFormData({ ...formData, phone: e.target.value })}
                     required
-                    disabled={isSubmitting}
+                    disabled={isPending}
                     className="h-12 pl-10 border-gray-200 focus:border-orange-500 focus:ring-orange-500"
                   />
                 </div>
@@ -262,7 +260,7 @@ export default function RegisterPage() {
                     value={formData.password}
                     onChange={(e) => setFormData({ ...formData, password: e.target.value })}
                     required
-                    disabled={isSubmitting}
+                    disabled={isPending}
                     className="h-12 pl-10 pr-12 border-gray-200 focus:border-orange-500 focus:ring-orange-500"
                   />
                   <button
@@ -300,7 +298,7 @@ export default function RegisterPage() {
                     value={formData.confirm_password}
                     onChange={(e) => setFormData({ ...formData, confirm_password: e.target.value })}
                     required
-                    disabled={isSubmitting}
+                    disabled={isPending}
                     className="h-12 pl-10 pr-12 border-gray-200 focus:border-orange-500 focus:ring-orange-500"
                   />
                   <button
@@ -326,9 +324,9 @@ export default function RegisterPage() {
               <Button
                 type="submit"
                 className="w-full h-12 bg-gradient-to-r from-orange-500 to-amber-600 text-white hover:from-orange-600 hover:to-amber-700 shadow-lg shadow-orange-500/25 hover:shadow-xl hover:shadow-orange-500/30 transition-all duration-300"
-                disabled={isSubmitting}
+                disabled={isPending}
               >
-                {isSubmitting ? (
+                {isPending ? (
                   <>
                     <Loader2 className="mr-2 h-4 w-4 animate-spin" />
                     Creating account...

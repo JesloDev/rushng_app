@@ -1,13 +1,13 @@
 'use client';
 
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useCallback } from 'react';
 import { useParams, useRouter } from 'next/navigation';
-import { providerApi, ratingApi, jobApi } from '@/lib/api';
+import { providerApi, ratingApi } from '@/lib/api';
 import { useAuth } from '@/hooks/useAuth';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
-import { Avatar, AvatarFallback } from '@/components/ui/avatar';
+import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 import { Skeleton } from '@/components/ui/skeleton';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import {
@@ -17,16 +17,11 @@ import {
   Clock,
   DollarSign,
   Shield,
-  CheckCircle2,
   MessageCircle,
   Phone,
   Mail,
-  Calendar,
-  Award,
-  ThumbsUp,
-  Users,
 } from 'lucide-react';
-import { formatDistanceToNow, format } from 'date-fns';
+import { formatDistanceToNow } from 'date-fns';
 import { toast } from 'sonner';
 
 interface Provider {
@@ -36,10 +31,10 @@ interface Provider {
     full_name: string;
     email: string;
     phone: string;
-    profile_picture: string;
+    profile_picture?: string;
     created_at: string;
   };
-  skills: string[];
+  skills?: string[];
   years_experience: number;
   hourly_rate: number;
   service_radius_km: number;
@@ -49,17 +44,17 @@ interface Provider {
   total_jobs_completed: number;
   total_jobs_cancelled: number;
   compliance_score: number;
-  portfolio_urls: string[];
-  description: string;
-  address: string;
-  city: string;
-  state: string;
+  portfolio_urls?: string[];
+  description?: string;
+  address?: string;
+  city?: string;
+  state?: string;
 }
 
 interface Review {
   id: string;
   rating: number;
-  comment: string;
+  comment?: string;
   created_at: string;
   rater: {
     full_name: string;
@@ -70,29 +65,29 @@ export default function ProviderProfilePage() {
   const params = useParams();
   const router = useRouter();
   const { user, isAuthenticated } = useAuth();
+  
   const [provider, setProvider] = useState<Provider | null>(null);
   const [reviews, setReviews] = useState<Review[]>([]);
   const [loading, setLoading] = useState(true);
   const [activeTab, setActiveTab] = useState('about');
 
-  const providerId = params.id as string;
+  const providerId = params?.id as string;
 
-  useEffect(() => {
-    fetchProvider();
-  }, [providerId]);
+  const fetchProvider = useCallback(async () => {
+    if (!providerId) return;
 
-  const fetchProvider = async () => {
     try {
+      setLoading(true);
       const [providerRes, reviewsRes] = await Promise.all([
         providerApi.get(providerId),
         ratingApi.user(providerId),
       ]);
 
-      if (providerRes.data.success) {
+      if (providerRes.data?.success) {
         setProvider(providerRes.data.data.provider);
       }
 
-      if (reviewsRes.data.success) {
+      if (reviewsRes.data?.success) {
         setReviews(reviewsRes.data.data.ratings || []);
       }
     } catch (error) {
@@ -100,7 +95,11 @@ export default function ProviderProfilePage() {
     } finally {
       setLoading(false);
     }
-  };
+  }, [providerId]);
+
+  useEffect(() => {
+    fetchProvider();
+  }, [fetchProvider]);
 
   const handleContact = () => {
     if (!isAuthenticated) {
@@ -118,9 +117,17 @@ export default function ProviderProfilePage() {
     router.push(`/jobs/post?provider=${providerId}`);
   };
 
+  const safeFormatDate = (dateString?: string) => {
+    if (!dateString) return 'recently';
+    const parsedDate = new Date(dateString);
+    return isNaN(parsedDate.getTime())
+      ? 'recently'
+      : formatDistanceToNow(parsedDate, { addSuffix: true });
+  };
+
   if (loading) {
     return (
-      <div className="container mx-auto px-4 py-8 max-w-4xl">
+      <div className="container mx-auto max-w-4xl px-4 py-8">
         <div className="flex flex-col md:flex-row gap-6">
           <Skeleton className="h-32 w-32 rounded-full" />
           <div className="flex-1 space-y-4">
@@ -134,7 +141,7 @@ export default function ProviderProfilePage() {
             </div>
           </div>
         </div>
-        <Skeleton className="h-64 w-full mt-6" />
+        <Skeleton className="mt-6 h-64 w-full" />
       </div>
     );
   }
@@ -151,16 +158,19 @@ export default function ProviderProfilePage() {
   }
 
   const isOwner = user?.id === provider.user.id;
+  const skillsList = provider.skills || [];
+  const portfolioList = provider.portfolio_urls || [];
 
   return (
-    <div className="container mx-auto px-4 py-8 max-w-4xl">
+    <div className="container mx-auto max-w-4xl px-4 py-8">
       {/* Profile Header */}
       <Card className="mb-6">
         <CardContent className="p-6">
           <div className="flex flex-col md:flex-row gap-6">
             <Avatar className="h-24 w-24 md:h-32 md:w-32">
-              <AvatarFallback className="text-4xl bg-gradient-to-br from-orange-500 to-amber-600 text-white">
-                {provider.user.full_name.charAt(0)}
+              <AvatarImage src={provider.user.profile_picture} alt={provider.user.full_name} />
+              <AvatarFallback className="bg-gradient-to-br from-orange-500 to-amber-600 text-4xl text-white">
+                {provider.user.full_name?.charAt(0) || 'P'}
               </AvatarFallback>
             </Avatar>
 
@@ -168,9 +178,9 @@ export default function ProviderProfilePage() {
               <div className="flex flex-wrap items-start justify-between gap-2">
                 <div>
                   <h1 className="text-2xl font-bold">{provider.user.full_name}</h1>
-                  <div className="flex flex-wrap items-center gap-2 mt-1">
+                  <div className="mt-1 flex flex-wrap items-center gap-2">
                     <Badge className="bg-orange-100 text-orange-700">
-                      {provider.verification_level.toUpperCase()}
+                      {provider.verification_level?.toUpperCase() || 'BASIC'}
                     </Badge>
                     {provider.is_available ? (
                       <Badge className="bg-green-100 text-green-700">Available</Badge>
@@ -179,13 +189,14 @@ export default function ProviderProfilePage() {
                     )}
                     <div className="flex items-center gap-1 text-sm">
                       <Star className="h-4 w-4 fill-yellow-400 text-yellow-400" />
-                      <span>{provider.rating || 'New'}</span>
+                      <span>{provider.rating ? provider.rating.toFixed(1) : 'New'}</span>
                     </div>
                   </div>
                 </div>
+
                 <div className="flex gap-2">
                   <Button variant="outline" onClick={handleContact}>
-                    <MessageCircle className="h-4 w-4 mr-2" />
+                    <MessageCircle className="mr-2 h-4 w-4" />
                     Message
                   </Button>
                   {!isOwner && (
@@ -196,7 +207,7 @@ export default function ProviderProfilePage() {
                 </div>
               </div>
 
-              <div className="flex flex-wrap gap-4 mt-4 text-sm text-muted-foreground">
+              <div className="mt-4 flex flex-wrap gap-4 text-sm text-muted-foreground">
                 <div className="flex items-center gap-1">
                   <MapPin className="h-4 w-4" />
                   <span>
@@ -210,7 +221,9 @@ export default function ProviderProfilePage() {
                 </div>
                 <div className="flex items-center gap-1">
                   <DollarSign className="h-4 w-4" />
-                  <span>₦{provider.hourly_rate?.toLocaleString() || 'Negotiable'}/hr</span>
+                  <span>
+                    {provider.hourly_rate ? `₦${provider.hourly_rate.toLocaleString()}/hr` : 'Negotiable'}
+                  </span>
                 </div>
                 <div className="flex items-center gap-1">
                   <Clock className="h-4 w-4" />
@@ -218,7 +231,7 @@ export default function ProviderProfilePage() {
                 </div>
                 <div className="flex items-center gap-1">
                   <Shield className="h-4 w-4" />
-                  <span>Compliance: {provider.compliance_score || 100}%</span>
+                  <span>Compliance: {provider.compliance_score ?? 100}%</span>
                 </div>
               </div>
             </div>
@@ -226,12 +239,12 @@ export default function ProviderProfilePage() {
         </CardContent>
       </Card>
 
-      {/* Tabs */}
+      {/* Navigation Tabs */}
       <Tabs value={activeTab} onValueChange={setActiveTab} className="space-y-6">
         <TabsList className="grid w-full grid-cols-3">
           <TabsTrigger value="about">About</TabsTrigger>
           <TabsTrigger value="reviews">Reviews ({reviews.length})</TabsTrigger>
-          <TabsTrigger value="portfolio">Portfolio</TabsTrigger>
+          <TabsTrigger value="portfolio">Portfolio ({portfolioList.length})</TabsTrigger>
         </TabsList>
 
         {/* About Tab */}
@@ -239,27 +252,27 @@ export default function ProviderProfilePage() {
           <Card>
             <CardContent className="p-6 space-y-4">
               <div>
-                <h3 className="font-semibold mb-2">About Me</h3>
-                <p className="text-gray-600 whitespace-pre-wrap">
+                <h3 className="mb-2 font-semibold">About Me</h3>
+                <p className="whitespace-pre-wrap text-gray-600">
                   {provider.description || 'No description provided yet.'}
                 </p>
               </div>
 
               <div>
-                <h3 className="font-semibold mb-2">Skills</h3>
+                <h3 className="mb-2 font-semibold">Skills</h3>
                 <div className="flex flex-wrap gap-2">
-                  {provider.skills.map((skill) => (
+                  {skillsList.map((skill) => (
                     <Badge key={skill} variant="secondary">
                       {skill.charAt(0).toUpperCase() + skill.slice(1)}
                     </Badge>
                   ))}
-                  {provider.skills.length === 0 && (
+                  {skillsList.length === 0 && (
                     <p className="text-sm text-muted-foreground">No skills listed</p>
                   )}
                 </div>
               </div>
 
-              <div className="grid grid-cols-2 md:grid-cols-4 gap-4 pt-4 border-t">
+              <div className="grid grid-cols-2 md:grid-cols-4 gap-4 border-t pt-4">
                 <div className="text-center">
                   <div className="text-2xl font-bold text-orange-500">
                     {provider.total_jobs_completed || 0}
@@ -268,13 +281,13 @@ export default function ProviderProfilePage() {
                 </div>
                 <div className="text-center">
                   <div className="text-2xl font-bold text-orange-500">
-                    {provider.rating || 'New'}
+                    {provider.rating ? provider.rating.toFixed(1) : 'New'}
                   </div>
                   <p className="text-sm text-muted-foreground">Rating</p>
                 </div>
                 <div className="text-center">
                   <div className="text-2xl font-bold text-orange-500">
-                    {provider.compliance_score || 100}%
+                    {provider.compliance_score ?? 100}%
                   </div>
                   <p className="text-sm text-muted-foreground">Compliance</p>
                 </div>
@@ -286,10 +299,10 @@ export default function ProviderProfilePage() {
                 </div>
               </div>
 
-              {/* Contact Info (for customers) */}
+              {/* Direct Contact Info */}
               {!isOwner && (
-                <div className="bg-gray-50 rounded-lg p-4 mt-4">
-                  <h3 className="font-semibold mb-2">Contact Information</h3>
+                <div className="mt-4 rounded-lg bg-gray-50 p-4">
+                  <h3 className="mb-2 font-semibold">Contact Information</h3>
                   <div className="space-y-2 text-sm">
                     <div className="flex items-center gap-2">
                       <Phone className="h-4 w-4 text-gray-400" />
@@ -315,8 +328,8 @@ export default function ProviderProfilePage() {
           <Card>
             <CardContent className="p-6">
               {reviews.length === 0 ? (
-                <div className="text-center py-8">
-                  <Star className="h-12 w-12 text-gray-300 mx-auto mb-4" />
+                <div className="py-8 text-center">
+                  <Star className="mx-auto mb-4 h-12 w-12 text-gray-300" />
                   <p className="text-muted-foreground">No reviews yet</p>
                 </div>
               ) : (
@@ -325,8 +338,8 @@ export default function ProviderProfilePage() {
                     <div key={review.id} className="border-b last:border-0 pb-4 last:pb-0">
                       <div className="flex items-center justify-between">
                         <div>
-                          <p className="font-medium">{review.rater.full_name}</p>
-                          <div className="flex items-center gap-1 mt-1">
+                          <p className="font-medium">{review.rater?.full_name || 'Anonymous User'}</p>
+                          <div className="mt-1 flex items-center gap-1">
                             {[...Array(5)].map((_, i) => (
                               <Star
                                 key={i}
@@ -340,11 +353,11 @@ export default function ProviderProfilePage() {
                           </div>
                         </div>
                         <span className="text-sm text-muted-foreground">
-                          {formatDistanceToNow(new Date(review.created_at), { addSuffix: true })}
+                          {safeFormatDate(review.created_at)}
                         </span>
                       </div>
                       {review.comment && (
-                        <p className="text-sm text-gray-600 mt-2">{review.comment}</p>
+                        <p className="mt-2 text-sm text-gray-600">{review.comment}</p>
                       )}
                     </div>
                   ))}
@@ -358,19 +371,20 @@ export default function ProviderProfilePage() {
         <TabsContent value="portfolio">
           <Card>
             <CardContent className="p-6">
-              {provider.portfolio_urls?.length === 0 ? (
-                <div className="text-center py-8">
-                  <Briefcase className="h-12 w-12 text-gray-300 mx-auto mb-4" />
+              {portfolioList.length === 0 ? (
+                <div className="py-8 text-center">
+                  <Briefcase className="mx-auto mb-4 h-12 w-12 text-gray-300" />
                   <p className="text-muted-foreground">No portfolio items yet</p>
                 </div>
               ) : (
                 <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-                  {provider.portfolio_urls.map((url, index) => (
-                    <div key={index} className="group relative">
+                  {portfolioList.map((url, index) => (
+                    <div key={`${url}-${index}`} className="group relative overflow-hidden rounded-lg border">
                       <img
                         src={url}
-                        alt={`Portfolio ${index + 1}`}
-                        className="w-full h-48 object-cover rounded-lg border"
+                        alt={`Portfolio item ${index + 1}`}
+                        loading="lazy"
+                        className="h-48 w-full object-cover transition-transform duration-200 group-hover:scale-105"
                         onError={(e) => {
                           (e.target as HTMLImageElement).src = '/placeholder-image.jpg';
                         }}

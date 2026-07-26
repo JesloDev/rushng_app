@@ -1,6 +1,6 @@
 'use client';
 
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
 import { useAuth } from '@/hooks/useAuth';
 import { jobApi } from '@/lib/api';
@@ -16,7 +16,7 @@ import {
   SelectValue,
 } from '@/components/ui/select';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
-import { Loader2 } from 'lucide-react';
+import { Loader2, MapPin } from 'lucide-react';
 import { toast } from 'sonner';
 
 const categories = [
@@ -27,21 +27,53 @@ const categories = [
 
 export default function PostJobPage() {
   const router = useRouter();
-  const { isAuthenticated } = useAuth();
+  const { isAuthenticated, loading: authLoading } = useAuth();
   const [loading, setLoading] = useState(false);
+  const [coords, setCoords] = useState<{ lat: number; lng: number }>({
+    lat: 6.5244,
+    lng: 3.3792,
+  });
+
   const [formData, setFormData] = useState({
     category: '',
     title: '',
     description: '',
     address: '',
-    city: '',
-    state: '',
+    city: 'Lagos',
+    state: 'Lagos',
     estimated_price: '',
   });
 
-  if (!isAuthenticated) {
-    router.push('/login');
-    return null;
+  // Handle redirect in useEffect to comply with React Hook Rules
+  useEffect(() => {
+    if (!authLoading && !isAuthenticated) {
+      router.push('/login');
+    }
+  }, [isAuthenticated, authLoading, router]);
+
+  // Attempt to capture browser geolocation for better matching
+  useEffect(() => {
+    if ('geolocation' in navigator) {
+      navigator.geolocation.getCurrentPosition(
+        (position) => {
+          setCoords({
+            lat: position.coords.latitude,
+            lng: position.coords.longitude,
+          });
+        },
+        () => {
+          // Gracefully fallback to default coordinates on denial
+        }
+      );
+    }
+  }, []);
+
+  if (authLoading || !isAuthenticated) {
+    return (
+      <div className="flex h-64 items-center justify-center">
+        <Loader2 className="h-8 w-8 animate-spin text-orange-500" />
+      </div>
+    );
   }
 
   const handleSubmit = async (e: React.FormEvent) => {
@@ -56,17 +88,17 @@ export default function PostJobPage() {
     try {
       const response = await jobApi.create({
         ...formData,
-        estimated_price: parseFloat(formData.estimated_price) || undefined,
-        lat: 6.5244, // Would get from geocoding
-        lng: 3.3792, // Would get from geocoding
+        estimated_price: formData.estimated_price ? parseFloat(formData.estimated_price) : undefined,
+        lat: coords.lat,
+        lng: coords.lng,
       });
       
-      if (response.data.success) {
+      if (response.data?.success) {
         toast.success('Job posted successfully!');
-        router.push('/jobs');
+        router.push('/jobs/my');
       }
     } catch (error) {
-      toast.error('Failed to post job');
+      toast.error('Failed to post job. Please try again.');
     } finally {
       setLoading(false);
     }
@@ -77,7 +109,9 @@ export default function PostJobPage() {
       <Card>
         <CardHeader>
           <CardTitle className="text-2xl">Post a Job</CardTitle>
-          <p className="text-sm text-muted-foreground">Describe what service you need</p>
+          <p className="text-sm text-muted-foreground">
+            Describe what service you need and connect with local service providers.
+          </p>
         </CardHeader>
         <CardContent>
           <form onSubmit={handleSubmit} className="space-y-6">
@@ -115,7 +149,7 @@ export default function PostJobPage() {
               <Label htmlFor="description">Description *</Label>
               <Textarea
                 id="description"
-                placeholder="Describe the job in detail..."
+                placeholder="Describe the job details, requirements, and timing..."
                 rows={5}
                 value={formData.description}
                 onChange={(e) => setFormData({ ...formData, description: e.target.value })}
@@ -124,7 +158,7 @@ export default function PostJobPage() {
             </div>
 
             <div className="space-y-2">
-              <Label htmlFor="address">Address *</Label>
+              <Label htmlFor="address">Address / Landmark *</Label>
               <Input
                 id="address"
                 placeholder="e.g., 45 Allen Avenue, Ikeja"
@@ -156,15 +190,15 @@ export default function PostJobPage() {
             </div>
 
             <div className="space-y-2">
-              <Label htmlFor="estimated_price">Estimated Price (₦)</Label>
+              <Label htmlFor="estimated_price">Estimated Budget (₦)</Label>
               <Input
                 id="estimated_price"
                 type="number"
-                placeholder="e.g., 5000"
+                placeholder="e.g., 15000"
                 value={formData.estimated_price}
                 onChange={(e) => setFormData({ ...formData, estimated_price: e.target.value })}
               />
-              <p className="text-xs text-muted-foreground">Leave empty if negotiable</p>
+              <p className="text-xs text-muted-foreground">Leave empty if price is open to negotiation</p>
             </div>
 
             <Button

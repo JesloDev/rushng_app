@@ -1,133 +1,281 @@
 'use client';
 
-import { useState, useEffect, useCallback } from 'react';
+import { useState, useEffect, useCallback, useRef } from 'react';
 import { notificationApi } from '@/lib/api';
 import { toast } from 'sonner';
 import type { Notification } from '@/types';
 
-export function useNotifications() {
+export interface PaginationState {
+  page: number;
+  per_page: number;
+  total: number;
+  pages: number;
+}
+
+export interface UseNotificationsOptions {
+  autoFetch?: boolean;
+  pollInterval?: number; // In milliseconds, e.g., 30000 for 30s
+  initialParams?: Record<string, any>;
+}
+
+export function useNotifications(options: UseNotificationsOptions = {}) {
+  const { autoFetch = true, pollInterval, initialParams } = options;
+
   const [notifications, setNotifications] = useState<Notification[]>([]);
-  const [unreadCount, setUnreadCount] = useState(0);
-  const [loading, setLoading] = useState(false);
+  const [unreadCount, setUnreadCount] = useState<number>(0);
+  const [loading, setLoading] = useState<boolean>(false);
   const [error, setError] = useState<string | null>(null);
-  const [pagination, setPagination] = useState({
+  const [pagination, setPagination] = useState<PaginationState>({
     page: 1,
     per_page: 20,
     total: 0,
     pages: 0,
   });
 
-  const fetchNotifications = useCallback(async (params?: any) => {
-    setLoading(true);
-    setError(null);
-    try {
-      const response = await notificationApi.list(params);
-      if (response.data.success) {
-        const data = response.data.data;
-        setNotifications(data.notifications || []);
-        setUnreadCount(data.unread_count || 0);
-        if (data.pagination) {
-          setPagination(data.pagination);
+  const pollTimerRef = useRef<NodeJS.Timeout | null>(null);
+
+  const fetchNotifications = useCallback(
+    async (params?: Record<string, any>) => {
+      setLoading(true);
+      setError(null);
+      try {
+        const queryParams = { ...initialParams, ...params };
+        const response = await notificationApi.list(queryParams);
+
+        if (response.data?.success) {
+          const resData = response.data.data || {};
+
+          // Flexible response mapping for different backend structures
+          const list: Notification[] = Array.isArray(resData)
+            ? resData
+            : resData.notifications || resData.items || response.data?.notifications || [];
+
+          setNotifications(list);
+
+          const count =
+            resData.unread_count ??
+            resData.unreadCount ??
+            response.data?.unread_count ??
+            list.filter((n) => !n.is_read && !n.read).length;
+
+          setUnreadCount(count);
+
+          if (resData.pagination) {
+            setPagination(resData.pagination);
+          } else if (response.data?.pagination) {
+            setPagination(response.data.pagination);
+          }
+        } else {
+          setError(response.data?.message || 'Failed to load notifications');
         }
-      } else {
-        setError(response.data.message || 'Failed to load notifications');
+      } catch (err: any) {
+        const msg =
+          err.response?.data?.error ||
+          err.response?.data?.message ||
+          'Failed to load notifications. Please try again.';
+        setError(msg);
+        toast.error('Failed to load notifications');
+      } finally {
+        setLoading(false);
       }
-    } catch (error: any) {
-      setError(error.response?.data?.error || 'Failed to load notifications');
-      toast.error('Failed to load notifications');
-    } finally {
-      setLoading(false);
+    },
+    [initialParams]
+  );
+
+  const getUnreadCount = useCallback(async (): Promise<number> => {
+    try {
+      const response = await notificationApi.unreadCount();
+      if (response.data?.success) {
+        const count =
+          response.data.data?.count ??
+          response.data.data?.unread_count ??
+          response.data?.count ??
+          0;
+        setUnreadCount(count);
+        return count;
+      }
+      return 0;
+    } catch {
+      return 0;
     }
   }, []);
 
-  const markAsRead = useCallback(async (id: string) => {
+  const markAsRead = useCallback(async (id: string): Promise<boolean> => {
+    let previousNotifications: Notification[] = [];
+    let previousUnreadCount = 0;
+
+    // Optimistic state update
+    setNotifications((prev) => {
+      previousNotifications = prev;
+      return prev.map((n) =>
+        n.id === id ? { ...n, is_read: true, read: true } : n
+      );
+    });
+
+    setUnreadCount((prev) => {
+      previousUnreadCount = prev;
+      return Math.max(0, prev - 1);
+    });
+
     try {
       const response = await notificationApi.markRead(id);
-      if (response.data.success) {
-        setNotifications(prev =>
-          prev.map((n: any) =>
-            n.id === id ? { ...n, is_read: true } : n
-          )
-        );
-        setUnreadCount(prev => Math.max(0, prev - 1));
+      if (response.data?.success) {
         return true;
       }
-      toast.error(response.data.message || 'Failed to mark as read');
+      // Rollback on soft failure
+      setNotifications(previousNotifications);
+      setUnreadCount(previousUnreadCount);
+      toast.error(response.data?.message || 'Failed to mark notification as read');
       return false;
-    } catch (error: any) {
-      toast.error(error.response?.data?.error || 'Failed to mark as read');
+    } catch (err: any) {
+      // Rollback on network/HTTP failure
+      setNotifications(previousNotifications);
+      setUnreadCount(previousUnreadCount);
+      toast.error(
+        err.response?.data?.error ||
+          err.response?.data?.message ||
+          'Failed to mark notification as read'
+      );
       return false;
     }
   }, []);
 
-  const markAllAsRead = useCallback(async () => {
+  const markAllAsRead = useCallback(async (): Promise<boolean> => {
+    let previousNotifications: Notification[] = [];
+    let previousUnreadCount = 0;
+
+    // Optimistic state update
+    setNotifications((prev) => {
+      previousNotifications = prev;
+      return prev.map((n) => ({ ...n, is_read: true, read: true }));
+    });
+
+    setUnreadCount((prev) => {
+      previousUnreadCount = prev;
+      return 0;
+    });
+
     try {
       const response = await notificationApi.markAllRead();
-      if (response.data.success) {
-        setNotifications(prev =>
-          prev.map((n: any) => ({ ...n, is_read: true }))
-        );
-        setUnreadCount(0);
+      if (response.data?.success) {
         toast.success('All notifications marked as read');
         return true;
       }
-      toast.error(response.data.message || 'Failed to mark all as read');
+      setNotifications(previousNotifications);
+      setUnreadCount(previousUnreadCount);
+      toast.error(response.data?.message || 'Failed to mark all as read');
       return false;
-    } catch (error: any) {
-      toast.error(error.response?.data?.error || 'Failed to mark all as read');
+    } catch (err: any) {
+      setNotifications(previousNotifications);
+      setUnreadCount(previousUnreadCount);
+      toast.error(
+        err.response?.data?.error ||
+          err.response?.data?.message ||
+          'Failed to mark all as read'
+      );
       return false;
     }
   }, []);
 
-  const deleteNotification = useCallback(async (id: string) => {
+  const deleteNotification = useCallback(async (id: string): Promise<boolean> => {
+    let previousNotifications: Notification[] = [];
+    let previousUnreadCount = 0;
+
+    // Optimistic state update
+    setNotifications((prev) => {
+      previousNotifications = prev;
+      const target = prev.find((n) => n.id === id);
+      const wasUnread = target ? (!target.is_read && !target.read) : false;
+
+      if (wasUnread) {
+        setUnreadCount((count) => {
+          previousUnreadCount = count;
+          return Math.max(0, count - 1);
+        });
+      }
+
+      return prev.filter((n) => n.id !== id);
+    });
+
     try {
       const response = await notificationApi.delete(id);
-      if (response.data.success) {
-        setNotifications(prev => prev.filter((n: any) => n.id !== id));
+      if (response.data?.success) {
         toast.success('Notification deleted');
         return true;
       }
-      toast.error(response.data.message || 'Failed to delete notification');
+      setNotifications(previousNotifications);
+      if (previousUnreadCount) setUnreadCount(previousUnreadCount);
+      toast.error(response.data?.message || 'Failed to delete notification');
       return false;
-    } catch (error: any) {
-      toast.error(error.response?.data?.error || 'Failed to delete notification');
+    } catch (err: any) {
+      setNotifications(previousNotifications);
+      if (previousUnreadCount) setUnreadCount(previousUnreadCount);
+      toast.error(
+        err.response?.data?.error ||
+          err.response?.data?.message ||
+          'Failed to delete notification'
+      );
       return false;
     }
   }, []);
 
-  const deleteAllNotifications = useCallback(async () => {
+  const deleteAllNotifications = useCallback(async (): Promise<boolean> => {
+    let previousNotifications: Notification[] = [];
+    let previousUnreadCount = 0;
+
+    setNotifications((prev) => {
+      previousNotifications = prev;
+      return [];
+    });
+
+    setUnreadCount((prev) => {
+      previousUnreadCount = prev;
+      return 0;
+    });
+
     try {
       const response = await notificationApi.deleteAll();
-      if (response.data.success) {
-        setNotifications([]);
-        setUnreadCount(0);
-        toast.success('All notifications deleted');
+      if (response.data?.success) {
+        toast.success('All notifications cleared');
         return true;
       }
-      toast.error(response.data.message || 'Failed to delete all notifications');
+      setNotifications(previousNotifications);
+      setUnreadCount(previousUnreadCount);
+      toast.error(response.data?.message || 'Failed to delete all notifications');
       return false;
-    } catch (error: any) {
-      toast.error(error.response?.data?.error || 'Failed to delete all notifications');
+    } catch (err: any) {
+      setNotifications(previousNotifications);
+      setUnreadCount(previousUnreadCount);
+      toast.error(
+        err.response?.data?.error ||
+          err.response?.data?.message ||
+          'Failed to delete all notifications'
+      );
       return false;
     }
   }, []);
 
-  const getUnreadCount = useCallback(async () => {
-    try {
-      const response = await notificationApi.unreadCount();
-      if (response.data.success) {
-        setUnreadCount(response.data.data.count || 0);
-        return response.data.data.count;
-      }
-      return 0;
-    } catch (error) {
-      return 0;
-    }
-  }, []);
-
+  // Initial fetch trigger
   useEffect(() => {
-    fetchNotifications();
-  }, [fetchNotifications]);
+    if (autoFetch) {
+      fetchNotifications();
+    }
+  }, [autoFetch, fetchNotifications]);
+
+  // Optional background polling effect
+  useEffect(() => {
+    if (pollInterval && pollInterval > 0) {
+      pollTimerRef.current = setInterval(() => {
+        getUnreadCount();
+      }, pollInterval);
+    }
+
+    return () => {
+      if (pollTimerRef.current) {
+        clearInterval(pollTimerRef.current);
+      }
+    };
+  }, [pollInterval, getUnreadCount]);
 
   return {
     notifications,
@@ -136,10 +284,10 @@ export function useNotifications() {
     error,
     pagination,
     fetchNotifications,
+    getUnreadCount,
     markAsRead,
     markAllAsRead,
     deleteNotification,
     deleteAllNotifications,
-    getUnreadCount,
   };
 }

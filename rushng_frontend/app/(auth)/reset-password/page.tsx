@@ -1,6 +1,6 @@
 'use client';
 
-import { useState } from 'react';
+import { useState, useEffect, Suspense } from 'react';
 import { useRouter, useSearchParams } from 'next/navigation';
 import Link from 'next/link';
 import { authApi } from '@/lib/api';
@@ -8,11 +8,30 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
-import { Loader2, ArrowLeft, CheckCircle2, AlertCircle, Eye, EyeOff, Mail, Lock, Shield, KeyRound } from 'lucide-react';
+import { Loader2, ArrowLeft, CheckCircle2, AlertCircle, Eye, EyeOff, Mail, Lock, Shield, KeyRound, Check, X } from 'lucide-react';
 import { toast } from 'sonner';
 import { motion } from 'framer-motion';
 
-export default function ResetPasswordPage() {
+// Password Strength Helper
+interface PasswordRequirements {
+  length: boolean;
+  hasUpper: boolean;
+  hasLower: boolean;
+  hasNumber: boolean;
+  hasSpecial: boolean;
+}
+
+const checkPasswordRequirements = (password: string): PasswordRequirements => {
+  return {
+    length: password.length >= 8,
+    hasUpper: /[A-Z]/.test(password),
+    hasLower: /[a-z]/.test(password),
+    hasNumber: /[0-9]/.test(password),
+    hasSpecial: /[^A-Za-z0-9]/.test(password),
+  };
+};
+
+function ResetPasswordForm() {
   const router = useRouter();
   const searchParams = useSearchParams();
   const token = searchParams.get('token');
@@ -26,6 +45,31 @@ export default function ResetPasswordPage() {
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [success, setSuccess] = useState(false);
+
+  // Live password metrics
+  const requirements = checkPasswordRequirements(newPassword);
+  const passedCount = Object.values(requirements).filter(Boolean).length;
+
+  // Compute strength score (0 to 100%)
+  const strengthPercentage = (passedCount / 5) * 100;
+  
+  const getStrengthLabel = () => {
+    if (passedCount <= 2) return { label: 'Weak', color: 'bg-red-500', textColor: 'text-red-500' };
+    if (passedCount <= 4) return { label: 'Medium', color: 'bg-amber-500', textColor: 'text-amber-500' };
+    return { label: 'Strong', color: 'bg-green-500', textColor: 'text-green-500' };
+  };
+
+  const strengthMeta = getStrengthLabel();
+
+  useEffect(() => {
+    let timer: NodeJS.Timeout;
+    if (success && step === 'reset') {
+      timer = setTimeout(() => {
+        router.push('/login');
+      }, 3000);
+    }
+    return () => clearTimeout(timer);
+  }, [success, step, router]);
 
   const handleRequestReset = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -60,8 +104,8 @@ export default function ResetPasswordPage() {
       return;
     }
 
-    if (newPassword.length < 8) {
-      setError('Password must be at least 8 characters long');
+    if (passedCount < 5) {
+      setError('Please ensure your password meets all strength requirements.');
       setIsSubmitting(false);
       return;
     }
@@ -76,9 +120,6 @@ export default function ResetPasswordPage() {
       await authApi.resetPassword({ token, new_password: newPassword });
       setSuccess(true);
       toast.success('Password reset successfully!');
-      setTimeout(() => {
-        router.push('/login');
-      }, 3000);
     } catch (err: any) {
       setError(err.response?.data?.error || 'Failed to reset password. Please try again.');
     } finally {
@@ -162,7 +203,6 @@ export default function ResetPasswordPage() {
 
   return (
     <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-orange-50 via-white to-orange-50/30 py-12 px-4 sm:px-6 lg:px-8">
-      {/* Background decorative elements */}
       <div className="absolute inset-0 -z-10 overflow-hidden">
         <div className="absolute -top-40 -right-40 h-80 w-80 rounded-full bg-orange-100/30 blur-3xl" />
         <div className="absolute -bottom-40 -left-40 h-80 w-80 rounded-full bg-amber-100/20 blur-3xl" />
@@ -281,13 +321,12 @@ export default function ResetPasswordPage() {
                     <Input
                       id="new_password"
                       type={showPassword ? 'text' : 'password'}
-                      placeholder="Create a new password (minimum 8 characters)"
+                      placeholder="Create a new password"
                       value={newPassword}
                       onChange={(e) => setNewPassword(e.target.value)}
                       required
                       disabled={isSubmitting}
                       className="h-12 pl-10 pr-12 border-gray-200 focus:border-orange-500 focus:ring-orange-500"
-                      minLength={8}
                     />
                     <button
                       type="button"
@@ -297,7 +336,37 @@ export default function ResetPasswordPage() {
                       {showPassword ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
                     </button>
                   </div>
-                  <p className="text-xs text-muted-foreground">Use 8+ characters with letters and numbers</p>
+
+                  {/* Real-time Password Strength Visualizer */}
+                  {newPassword.length > 0 && (
+                    <div className="space-y-3 pt-2">
+                      <div className="space-y-1">
+                        <div className="flex justify-between items-center text-xs">
+                          <span className="text-muted-foreground">Strength:</span>
+                          <span className={`font-semibold ${strengthMeta.textColor}`}>
+                            {strengthMeta.label}
+                          </span>
+                        </div>
+                        <div className="h-1.5 w-full bg-gray-100 rounded-full overflow-hidden">
+                          <motion.div
+                            className={`h-full ${strengthMeta.color}`}
+                            initial={{ width: 0 }}
+                            animate={{ width: `${strengthPercentage}%` }}
+                            transition={{ duration: 0.3 }}
+                          />
+                        </div>
+                      </div>
+
+                      {/* Requirement Checklist */}
+                      <div className="grid grid-cols-2 gap-2 text-xs">
+                        <RequirementItem met={requirements.length} label="8+ characters" />
+                        <RequirementItem met={requirements.hasUpper} label="Uppercase letter" />
+                        <RequirementItem met={requirements.hasLower} label="Lowercase letter" />
+                        <RequirementItem met={requirements.hasNumber} label="Number (0-9)" />
+                        <RequirementItem met={requirements.hasSpecial} label="Special character" />
+                      </div>
+                    </div>
+                  )}
                 </div>
 
                 <div className="space-y-2">
@@ -322,12 +391,17 @@ export default function ResetPasswordPage() {
                       {showConfirmPassword ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
                     </button>
                   </div>
+                  {confirmPassword.length > 0 && newPassword !== confirmPassword && (
+                    <p className="text-xs text-red-500 flex items-center gap-1 mt-1">
+                      <X className="h-3 w-3" /> Passwords do not match
+                    </p>
+                  )}
                 </div>
 
                 <Button
                   type="submit"
                   className="w-full h-12 bg-gradient-to-r from-orange-500 to-amber-600 text-white hover:from-orange-600 hover:to-amber-700 shadow-lg shadow-orange-500/25 hover:shadow-xl hover:shadow-orange-500/30 transition-all duration-300"
-                  disabled={isSubmitting}
+                  disabled={isSubmitting || (step === 'reset' && passedCount < 5)}
                 >
                   {isSubmitting ? (
                     <>
@@ -363,5 +437,32 @@ export default function ResetPasswordPage() {
         </Card>
       </motion.div>
     </div>
+  );
+}
+
+function RequirementItem({ met, label }: { met: boolean; label: string }) {
+  return (
+    <div className={`flex items-center gap-1.5 transition-colors ${met ? 'text-green-600 font-medium' : 'text-gray-400'}`}>
+      {met ? (
+        <Check className="h-3.5 w-3.5 text-green-600 shrink-0" />
+      ) : (
+        <div className="h-1.5 w-1.5 rounded-full bg-gray-300 mx-1 shrink-0" />
+      )}
+      <span>{label}</span>
+    </div>
+  );
+}
+
+export default function ResetPasswordPage() {
+  return (
+    <Suspense
+      fallback={
+        <div className="min-h-screen flex items-center justify-center">
+          <Loader2 className="h-8 w-8 animate-spin text-orange-500" />
+        </div>
+      }
+    >
+      <ResetPasswordForm />
+    </Suspense>
   );
 }

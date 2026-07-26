@@ -6,14 +6,14 @@ import { cn } from '@/lib/utils';
 interface LoadingSpinnerProps {
   size?: 'sm' | 'md' | 'lg' | 'xl';
   className?: string;
-  text?: string;
+  text?: string | null;
   fullScreen?: boolean;
 }
 
 export function LoadingSpinner({
   size = 'md',
   className,
-  text = 'Loading...',
+  text,
   fullScreen = false,
 }: LoadingSpinnerProps) {
   const sizeClasses = {
@@ -23,14 +23,34 @@ export function LoadingSpinner({
     xl: 'h-16 w-16',
   };
 
-  return (
-    <div className={cn(
-      'flex flex-col items-center justify-center gap-3',
-      fullScreen && 'fixed inset-0 z-50 bg-white/80 backdrop-blur-sm',
-      className
-    )}>
-      <Loader2 className={cn('animate-spin text-orange-500', sizeClasses[size])} />
-      {text && <p className="text-sm text-muted-foreground animate-pulse">{text}</p>}
+  const textClasses = {
+    sm: 'text-xs',
+    md: 'text-sm',
+    lg: 'text-base font-medium',
+    xl: 'text-lg font-medium',
+  };
+
+  const content = (
+    <div
+      role="status"
+      className={cn(
+        'flex flex-col items-center justify-center gap-3 text-center',
+        fullScreen && 'fixed inset-0 z-50 bg-white/80 dark:bg-slate-950/80 backdrop-blur-sm',
+        className
+      )}
+    >
+      <div className="relative flex items-center justify-center">
+        <Loader2 className={cn('animate-spin text-orange-600 dark:text-orange-500', sizeClasses[size])} />
+      </div>
+
+      {text && (
+        <p className={cn('text-slate-500 dark:text-slate-400 animate-pulse leading-none', textClasses[size])}>
+          {text}
+        </p>
+      )}
+      <span className="sr-only">Loading...</span>
     </div>
   );
+
+  return content;
 }

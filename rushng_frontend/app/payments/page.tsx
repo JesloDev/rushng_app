@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useMemo } from 'react';
 import Link from 'next/link';
 import { paymentApi } from '@/lib/api';
 import { useAuth } from '@/hooks/useAuth';
@@ -14,18 +14,18 @@ import {
   Wallet, 
   DollarSign, 
   ArrowUpRight, 
-  ArrowDownRight,
   Calendar,
   CheckCircle2,
   Clock,
   XCircle,
+  AlertCircle, // Fixed missing import
   Download,
   Eye,
   Plus,
   Building2,
   Smartphone,
 } from 'lucide-react';
-import { formatDistanceToNow, format } from 'date-fns';
+import { formatDistanceToNow } from 'date-fns';
 import { toast } from 'sonner';
 
 interface Payment {
@@ -33,11 +33,11 @@ interface Payment {
   amount: number;
   platform_fee: number;
   provider_earnings: number;
-  status: string;
+  status: 'pending' | 'held' | 'released' | 'refunded' | 'failed' | 'disputed' | string;
   provider: string;
   reference: string;
   created_at: string;
-  job: {
+  job?: {
     id: string;
     title: string;
   };
@@ -47,6 +47,7 @@ export default function PaymentsPage() {
   const { isAuthenticated } = useAuth();
   const [payments, setPayments] = useState<Payment[]>([]);
   const [loading, setLoading] = useState(true);
+  const [activeTab, setActiveTab] = useState('all');
   const [stats, setStats] = useState({
     total: 0,
     released: 0,
@@ -64,13 +65,13 @@ export default function PaymentsPage() {
     try {
       const response = await paymentApi.me();
       if (response.data.success) {
-        const data = response.data.data.payments || [];
+        const data: Payment[] = response.data.data.payments || [];
         setPayments(data);
         setStats({
           total: data.length,
-          released: data.filter((p: any) => p.status === 'released').length,
-          pending: data.filter((p: any) => p.status === 'held' || p.status === 'pending').length,
-          total_amount: data.reduce((sum: number, p: any) => sum + p.amount, 0),
+          released: data.filter((p) => p.status === 'released').length,
+          pending: data.filter((p) => p.status === 'held' || p.status === 'pending').length,
+          total_amount: data.reduce((sum, p) => sum + p.amount, 0),
         });
       }
     } catch (error) {
@@ -80,36 +81,42 @@ export default function PaymentsPage() {
     }
   };
 
+  const filteredPayments = useMemo(() => {
+    if (activeTab === 'all') return payments;
+    if (activeTab === 'held') return payments.filter((p) => p.status === 'held' || p.status === 'pending');
+    return payments.filter((p) => p.status === activeTab);
+  }, [payments, activeTab]);
+
   const getStatusBadge = (status: string) => {
     const configs: Record<string, { label: string; className: string; icon: React.ReactNode }> = {
       pending: { 
         label: 'Pending', 
-        className: 'bg-yellow-100 text-yellow-700',
+        className: 'bg-yellow-100 text-yellow-700 dark:bg-yellow-900/30 dark:text-yellow-400',
         icon: <Clock className="h-3 w-3" />
       },
       held: { 
         label: 'Held in Escrow', 
-        className: 'bg-blue-100 text-blue-700',
+        className: 'bg-blue-100 text-blue-700 dark:bg-blue-900/30 dark:text-blue-400',
         icon: <Clock className="h-3 w-3" />
       },
       released: { 
         label: 'Released', 
-        className: 'bg-green-100 text-green-700',
+        className: 'bg-green-100 text-green-700 dark:bg-green-900/30 dark:text-green-400',
         icon: <CheckCircle2 className="h-3 w-3" />
       },
       refunded: { 
         label: 'Refunded', 
-        className: 'bg-purple-100 text-purple-700',
+        className: 'bg-purple-100 text-purple-700 dark:bg-purple-900/30 dark:text-purple-400',
         icon: <ArrowUpRight className="h-3 w-3" />
       },
       failed: { 
         label: 'Failed', 
-        className: 'bg-red-100 text-red-700',
+        className: 'bg-red-100 text-red-700 dark:bg-red-900/30 dark:text-red-400',
         icon: <XCircle className="h-3 w-3" />
       },
       disputed: { 
         label: 'Disputed', 
-        className: 'bg-orange-100 text-orange-700',
+        className: 'bg-orange-100 text-orange-700 dark:bg-orange-900/30 dark:text-orange-400',
         icon: <AlertCircle className="h-3 w-3" />
       },
     };
@@ -117,7 +124,7 @@ export default function PaymentsPage() {
   };
 
   const getProviderIcon = (provider: string) => {
-    switch (provider) {
+    switch (provider.toLowerCase()) {
       case 'opay':
         return <Smartphone className="h-5 w-5" />;
       case 'paystack':
@@ -135,7 +142,7 @@ export default function PaymentsPage() {
       paystack: 'Paystack',
       flutterwave: 'Flutterwave',
     };
-    return names[provider] || provider;
+    return names[provider.toLowerCase()] || provider;
   };
 
   if (loading) {
@@ -182,7 +189,7 @@ export default function PaymentsPage() {
                 <p className="text-sm text-muted-foreground">Total Payments</p>
                 <p className="text-3xl font-bold">{stats.total}</p>
               </div>
-              <div className="rounded-lg bg-blue-100 p-3 text-blue-600">
+              <div className="rounded-lg bg-blue-100 dark:bg-blue-900/40 p-3 text-blue-600 dark:text-blue-400">
                 <Wallet className="h-6 w-6" />
               </div>
             </div>
@@ -198,7 +205,7 @@ export default function PaymentsPage() {
                   ₦{stats.total_amount.toLocaleString()}
                 </p>
               </div>
-              <div className="rounded-lg bg-green-100 p-3 text-green-600">
+              <div className="rounded-lg bg-green-100 dark:bg-green-900/40 p-3 text-green-600 dark:text-green-400">
                 <DollarSign className="h-6 w-6" />
               </div>
             </div>
@@ -212,7 +219,7 @@ export default function PaymentsPage() {
                 <p className="text-sm text-muted-foreground">Released</p>
                 <p className="text-3xl font-bold text-green-500">{stats.released}</p>
               </div>
-              <div className="rounded-lg bg-green-100 p-3 text-green-600">
+              <div className="rounded-lg bg-green-100 dark:bg-green-900/40 p-3 text-green-600 dark:text-green-400">
                 <ArrowUpRight className="h-6 w-6" />
               </div>
             </div>
@@ -223,10 +230,10 @@ export default function PaymentsPage() {
           <CardContent className="p-6">
             <div className="flex items-center justify-between">
               <div>
-                <p className="text-sm text-muted-foreground">Pending</p>
+                <p className="text-sm text-muted-foreground">Pending / Held</p>
                 <p className="text-3xl font-bold text-orange-500">{stats.pending}</p>
               </div>
-              <div className="rounded-lg bg-orange-100 p-3 text-orange-600">
+              <div className="rounded-lg bg-orange-100 dark:bg-orange-900/40 p-3 text-orange-600 dark:text-orange-400">
                 <Clock className="h-6 w-6" />
               </div>
             </div>
@@ -245,18 +252,18 @@ export default function PaymentsPage() {
         <CardContent>
           <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
             <div className="flex items-center gap-3 rounded-lg border p-4 hover:border-orange-300 transition">
-              <div className="rounded-lg bg-orange-100 p-2 text-orange-600">
+              <div className="rounded-lg bg-orange-100 dark:bg-orange-900/40 p-2 text-orange-600 dark:text-orange-400">
                 <Smartphone className="h-6 w-6" />
               </div>
               <div>
                 <p className="font-medium">OPay</p>
                 <p className="text-sm text-muted-foreground">Connected</p>
               </div>
-              <Badge className="ml-auto bg-green-100 text-green-700">Active</Badge>
+              <Badge className="ml-auto bg-green-100 text-green-700 dark:bg-green-900/30 dark:text-green-400">Active</Badge>
             </div>
 
             <div className="flex items-center gap-3 rounded-lg border p-4 hover:border-orange-300 transition opacity-50">
-              <div className="rounded-lg bg-gray-100 p-2 text-gray-400">
+              <div className="rounded-lg bg-gray-100 dark:bg-gray-800 p-2 text-gray-400">
                 <CreditCard className="h-6 w-6" />
               </div>
               <div>
@@ -269,7 +276,7 @@ export default function PaymentsPage() {
             </div>
 
             <div className="flex items-center gap-3 rounded-lg border p-4 hover:border-orange-300 transition opacity-50">
-              <div className="rounded-lg bg-gray-100 p-2 text-gray-400">
+              <div className="rounded-lg bg-gray-100 dark:bg-gray-800 p-2 text-gray-400">
                 <Building2 className="h-6 w-6" />
               </div>
               <div>
@@ -293,7 +300,7 @@ export default function PaymentsPage() {
           </CardTitle>
         </CardHeader>
         <CardContent>
-          <Tabs defaultValue="all" className="space-y-4">
+          <Tabs defaultValue="all" value={activeTab} onValueChange={setActiveTab} className="space-y-4">
             <TabsList>
               <TabsTrigger value="all">All</TabsTrigger>
               <TabsTrigger value="released">Released</TabsTrigger>
@@ -301,21 +308,21 @@ export default function PaymentsPage() {
               <TabsTrigger value="failed">Failed</TabsTrigger>
             </TabsList>
 
-            <TabsContent value="all">
-              {payments.length === 0 ? (
+            <TabsContent value={activeTab}>
+              {filteredPayments.length === 0 ? (
                 <div className="text-center py-8">
                   <Wallet className="h-12 w-12 text-gray-300 mx-auto mb-4" />
-                  <p className="text-muted-foreground">No transactions yet</p>
+                  <p className="text-muted-foreground">No transactions found</p>
                 </div>
               ) : (
                 <div className="space-y-4">
-                  {payments.map((payment) => {
+                  {filteredPayments.map((payment) => {
                     const status = getStatusBadge(payment.status);
                     return (
-                      <Link href={`/payments/${payment.id}`} key={payment.id}>
+                      <Link href={`/payments/${payment.id}`} key={payment.id} className="block">
                         <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-3 rounded-lg border p-4 hover:shadow-md transition">
                           <div className="flex items-center gap-4">
-                            <div className="rounded-lg bg-gray-100 p-2">
+                            <div className="rounded-lg bg-gray-100 dark:bg-gray-800 p-2">
                               {getProviderIcon(payment.provider)}
                             </div>
                             <div>
@@ -323,11 +330,6 @@ export default function PaymentsPage() {
                                 <p className="font-medium">
                                   {payment.job?.title || 'Payment'}
                                 </p>
-                                {status.icon && (
-                                  <span className="text-muted-foreground">
-                                    {status.icon}
-                                  </span>
-                                )}
                               </div>
                               <div className="flex flex-wrap items-center gap-3 text-sm text-muted-foreground">
                                 <span>{getProviderName(payment.provider)}</span>
@@ -338,17 +340,18 @@ export default function PaymentsPage() {
                                 </span>
                                 <span>•</span>
                                 <span className="font-mono text-xs">
-                                  Ref: {payment.reference.slice(0, 12)}...
+                                  Ref: {payment.reference ? `${payment.reference.slice(0, 12)}...` : 'N/A'}
                                 </span>
                               </div>
                             </div>
                           </div>
-                          <div className="flex items-center gap-4">
-                            <div className="text-right">
+                          <div className="flex items-center gap-4 w-full md:w-auto justify-between md:justify-end">
+                            <div className="text-left md:text-right">
                               <p className="font-semibold text-orange-500">
                                 ₦{payment.amount.toLocaleString()}
                               </p>
-                              <Badge className={status.className}>
+                              <Badge className={`gap-1 ${status.className}`}>
+                                {status.icon}
                                 {status.label}
                               </Badge>
                             </div>
@@ -363,8 +366,6 @@ export default function PaymentsPage() {
                 </div>
               )}
             </TabsContent>
-
-            {/* Similar content for other tabs - filtered by status */}
           </Tabs>
         </CardContent>
       </Card>

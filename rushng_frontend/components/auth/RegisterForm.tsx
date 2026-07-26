@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useEffect } from 'react';
+import { useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { useAuth } from '@/hooks/useAuth';
 import { Button } from '@/components/ui/button';
@@ -29,6 +29,35 @@ interface FieldErrors {
   confirm_password?: string;
 }
 
+// Compute password strength directly without extra renders/state
+const getPasswordStrength = (password: string) => {
+  if (!password) {
+    return { score: 0, label: 'Password strength', color: 'text-muted-foreground' };
+  }
+
+  let score = 0;
+  if (password.length >= 8) score++;
+  if (/[a-z]/.test(password) && /[A-Z]/.test(password)) score++;
+  if (/\d/.test(password)) score++;
+  if (/[^a-zA-Z0-9]/.test(password)) score++;
+
+  const strengthMap = [
+    { label: 'Very Weak', color: 'text-destructive' },
+    { label: 'Weak password', color: 'text-destructive' },
+    { label: 'Fair password', color: 'text-orange-500' },
+    { label: 'Good password', color: 'text-amber-500' },
+    { label: 'Strong password', color: 'text-emerald-600' },
+  ];
+
+  const index = Math.min(score, strengthMap.length - 1);
+
+  return {
+    score,
+    label: strengthMap[index].label,
+    color: strengthMap[index].color,
+  };
+};
+
 export function RegisterForm() {
   const router = useRouter();
   const { register, loading } = useAuth();
@@ -36,7 +65,6 @@ export function RegisterForm() {
   const [showPassword, setShowPassword] = useState(false);
   const [showConfirmPassword, setShowConfirmPassword] = useState(false);
   const [fieldErrors, setFieldErrors] = useState<FieldErrors>({});
-  const [passwordStrength, setPasswordStrength] = useState({ score: 0, label: '', color: '' });
 
   const [formData, setFormData] = useState({
     full_name: '',
@@ -47,38 +75,7 @@ export function RegisterForm() {
     role: 'customer',
   });
 
-  // Calculate password strength without array bounds issues
-  useEffect(() => {
-    if (formData.password) {
-      const checkStrength = (password: string) => {
-        let score = 0;
-        if (password.length >= 8) score++;
-        if (/[a-z]/.test(password) && /[A-Z]/.test(password)) score++;
-        if (/\d/.test(password)) score++;
-        if (/[^a-zA-Z0-9]/.test(password)) score++;
-
-        const strengthMap = [
-          { label: 'Very Weak', color: 'text-red-500' },
-          { label: 'Weak password', color: 'text-red-500' },
-          { label: 'Fair password', color: 'text-orange-500' },
-          { label: 'Good password', color: 'text-amber-500' },
-          { label: 'Strong password', color: 'text-emerald-600' },
-        ];
-
-        const index = Math.min(score, strengthMap.length - 1);
-
-        return {
-          score,
-          label: strengthMap[index].label,
-          color: strengthMap[index].color,
-        };
-      };
-
-      setPasswordStrength(checkStrength(formData.password));
-    } else {
-      setPasswordStrength({ score: 0, label: 'Password strength', color: 'text-gray-400' });
-    }
-  }, [formData.password]);
+  const passwordStrength = getPasswordStrength(formData.password);
 
   const handleInputChange = (field: keyof typeof formData, value: string) => {
     setFormData((prev) => ({ ...prev, [field]: value }));
@@ -162,26 +159,28 @@ export function RegisterForm() {
     <form onSubmit={handleSubmit} className="space-y-6 text-left" noValidate>
       {/* Full Name */}
       <div className="space-y-2">
-        <Label htmlFor="full_name" className="block text-sm font-semibold text-gray-700">
+        <Label htmlFor="full_name" className="block text-sm font-semibold">
           Full Name
         </Label>
         <div className="relative">
-          <User className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-gray-400" />
+          <User className="absolute left-3.5 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
           <Input
             id="full_name"
             placeholder="Enter your full name (e.g., John Doe)"
             value={formData.full_name}
             onChange={(e) => handleInputChange('full_name', e.target.value)}
             disabled={loading}
-            className={`h-12 rounded-lg border bg-white pl-10 pr-4 outline-none transition-all ${
+            aria-invalid={!!fieldErrors.full_name}
+            aria-describedby={fieldErrors.full_name ? 'full_name-error' : undefined}
+            className={`h-12 pl-10 pr-4 transition-all ${
               fieldErrors.full_name
-                ? 'border-red-500 focus-visible:ring-1 focus-visible:ring-red-500'
-                : 'border-gray-200 focus-visible:border-orange-500 focus-visible:ring-1 focus-visible:ring-orange-500'
+                ? 'border-destructive focus-visible:ring-destructive'
+                : 'focus-visible:ring-primary'
             }`}
           />
         </div>
         {fieldErrors.full_name && (
-          <p className="flex items-center gap-1 text-xs font-medium text-red-600">
+          <p id="full_name-error" className="flex items-center gap-1 text-xs font-medium text-destructive">
             <AlertCircle className="h-3.5 w-3.5 shrink-0" />
             {fieldErrors.full_name}
           </p>
@@ -190,11 +189,11 @@ export function RegisterForm() {
 
       {/* Email Address */}
       <div className="space-y-2">
-        <Label htmlFor="email" className="block text-sm font-semibold text-gray-700">
+        <Label htmlFor="email" className="block text-sm font-semibold">
           Email Address
         </Label>
         <div className="relative">
-          <Mail className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-gray-400" />
+          <Mail className="absolute left-3.5 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
           <Input
             id="email"
             type="email"
@@ -202,15 +201,17 @@ export function RegisterForm() {
             value={formData.email}
             onChange={(e) => handleInputChange('email', e.target.value)}
             disabled={loading}
-            className={`h-12 rounded-lg border bg-white pl-10 pr-4 outline-none transition-all ${
+            aria-invalid={!!fieldErrors.email}
+            aria-describedby={fieldErrors.email ? 'email-error' : undefined}
+            className={`h-12 pl-10 pr-4 transition-all ${
               fieldErrors.email
-                ? 'border-red-500 focus-visible:ring-1 focus-visible:ring-red-500'
-                : 'border-gray-200 focus-visible:border-orange-500 focus-visible:ring-1 focus-visible:ring-orange-500'
+                ? 'border-destructive focus-visible:ring-destructive'
+                : 'focus-visible:ring-primary'
             }`}
           />
         </div>
         {fieldErrors.email && (
-          <p className="flex items-center gap-1 text-xs font-medium text-red-600">
+          <p id="email-error" className="flex items-center gap-1 text-xs font-medium text-destructive">
             <AlertCircle className="h-3.5 w-3.5 shrink-0" />
             {fieldErrors.email}
           </p>
@@ -219,11 +220,11 @@ export function RegisterForm() {
 
       {/* Phone Number */}
       <div className="space-y-2">
-        <Label htmlFor="phone" className="block text-sm font-semibold text-gray-700">
+        <Label htmlFor="phone" className="block text-sm font-semibold">
           Phone Number
         </Label>
         <div className="relative">
-          <Phone className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-gray-400" />
+          <Phone className="absolute left-3.5 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
           <Input
             id="phone"
             type="tel"
@@ -231,15 +232,17 @@ export function RegisterForm() {
             value={formData.phone}
             onChange={(e) => handleInputChange('phone', e.target.value)}
             disabled={loading}
-            className={`h-12 rounded-lg border bg-white pl-10 pr-4 outline-none transition-all ${
+            aria-invalid={!!fieldErrors.phone}
+            aria-describedby={fieldErrors.phone ? 'phone-error' : undefined}
+            className={`h-12 pl-10 pr-4 transition-all ${
               fieldErrors.phone
-                ? 'border-red-500 focus-visible:ring-1 focus-visible:ring-red-500'
-                : 'border-gray-200 focus-visible:border-orange-500 focus-visible:ring-1 focus-visible:ring-orange-500'
+                ? 'border-destructive focus-visible:ring-destructive'
+                : 'focus-visible:ring-primary'
             }`}
           />
         </div>
         {fieldErrors.phone && (
-          <p className="flex items-center gap-1 text-xs font-medium text-red-600">
+          <p id="phone-error" className="flex items-center gap-1 text-xs font-medium text-destructive">
             <AlertCircle className="h-3.5 w-3.5 shrink-0" />
             {fieldErrors.phone}
           </p>
@@ -247,23 +250,25 @@ export function RegisterForm() {
       </div>
 
       {/* Role Selector Cards */}
-      <div className="space-y-3">
-        <span className="block text-sm font-semibold text-gray-700">What are you looking for?</span>
+      <div className="space-y-3" role="radiogroup" aria-label="Account type">
+        <span className="block text-sm font-semibold">What are you looking for?</span>
         <div className="grid grid-cols-2 gap-4">
           {/* Customer Card */}
           <button
             type="button"
+            role="radio"
+            aria-checked={formData.role === 'customer'}
             onClick={() => handleInputChange('role', 'customer')}
             disabled={loading}
             className={`relative flex flex-col items-center justify-center p-4 rounded-xl border transition-all cursor-pointer ${
               formData.role === 'customer'
-                ? 'border-orange-500 bg-orange-100/50 shadow-sm'
-                : 'border-gray-200 hover:bg-gray-50'
+                ? 'border-primary bg-primary/10 shadow-sm'
+                : 'border-border hover:bg-accent'
             }`}
           >
-            <User className="h-6 w-6 text-orange-600 mb-2" />
-            <span className="text-sm font-semibold text-gray-900 text-center">Hire Services</span>
-            <span className="text-[10px] text-gray-500 text-center leading-tight mt-1">
+            <User className="h-6 w-6 text-primary mb-2" />
+            <span className="text-sm font-semibold text-center">Hire Services</span>
+            <span className="text-[10px] text-muted-foreground text-center leading-tight mt-1">
               I'm a Customer looking for services
             </span>
           </button>
@@ -271,17 +276,19 @@ export function RegisterForm() {
           {/* Provider Card */}
           <button
             type="button"
+            role="radio"
+            aria-checked={formData.role === 'provider'}
             onClick={() => handleInputChange('role', 'provider')}
             disabled={loading}
             className={`relative flex flex-col items-center justify-center p-4 rounded-xl border transition-all cursor-pointer ${
               formData.role === 'provider'
-                ? 'border-orange-500 bg-orange-100/50 shadow-sm'
-                : 'border-gray-200 hover:bg-gray-50'
+                ? 'border-primary bg-primary/10 shadow-sm'
+                : 'border-border hover:bg-accent'
             }`}
           >
-            <Briefcase className="h-6 w-6 text-orange-600 mb-2" />
-            <span className="text-sm font-semibold text-gray-900 text-center">Provide Services</span>
-            <span className="text-[10px] text-gray-500 text-center leading-tight mt-1">
+            <Briefcase className="h-6 w-6 text-primary mb-2" />
+            <span className="text-sm font-semibold text-center">Provide Services</span>
+            <span className="text-[10px] text-muted-foreground text-center leading-tight mt-1">
               I'm a Provider offering services
             </span>
           </button>
@@ -290,11 +297,11 @@ export function RegisterForm() {
 
       {/* Password Field */}
       <div className="space-y-2">
-        <Label htmlFor="password" className="block text-sm font-semibold text-gray-700">
+        <Label htmlFor="password" className="block text-sm font-semibold">
           Password
         </Label>
         <div className="relative">
-          <Lock className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-gray-400" />
+          <Lock className="absolute left-3.5 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
           <Input
             id="password"
             type={showPassword ? 'text' : 'password'}
@@ -302,17 +309,19 @@ export function RegisterForm() {
             value={formData.password}
             onChange={(e) => handleInputChange('password', e.target.value)}
             disabled={loading}
-            className={`h-12 rounded-lg border bg-white pl-10 pr-12 outline-none transition-all ${
+            aria-invalid={!!fieldErrors.password}
+            aria-describedby={fieldErrors.password ? 'password-error' : undefined}
+            className={`h-12 pl-10 pr-12 transition-all ${
               fieldErrors.password
-                ? 'border-red-500 focus-visible:ring-1 focus-visible:ring-red-500'
-                : 'border-gray-200 focus-visible:border-orange-500 focus-visible:ring-1 focus-visible:ring-orange-500'
+                ? 'border-destructive focus-visible:ring-destructive'
+                : 'focus-visible:ring-primary'
             }`}
           />
           <button
             type="button"
             aria-label={showPassword ? 'Hide password' : 'Show password'}
             aria-pressed={showPassword}
-            className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-400 hover:text-orange-600 transition-colors focus:outline-none"
+            className="absolute right-3.5 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground transition-colors focus:outline-none"
             onClick={() => setShowPassword(!showPassword)}
           >
             {showPassword ? <EyeOff className="h-5 w-5" /> : <Eye className="h-5 w-5" />}
@@ -320,20 +329,20 @@ export function RegisterForm() {
         </div>
 
         {/* 4-Bar Strength Indicator Meter */}
-        <div className="mt-3 flex gap-1 h-1 w-full rounded-full overflow-hidden bg-gray-200">
+        <div className="mt-3 flex gap-1 h-1 w-full rounded-full overflow-hidden bg-muted">
           {[1, 2, 3, 4].map((step) => (
             <div
               key={step}
               className={`flex-1 transition-colors ${
                 passwordStrength.score >= step
                   ? passwordStrength.score <= 1
-                    ? 'bg-red-500'
+                    ? 'bg-destructive'
                     : passwordStrength.score === 2
                     ? 'bg-orange-500'
                     : passwordStrength.score === 3
                     ? 'bg-amber-500'
                     : 'bg-emerald-600'
-                  : 'bg-gray-200'
+                  : 'bg-muted'
               }`}
             />
           ))}
@@ -343,7 +352,7 @@ export function RegisterForm() {
         </span>
 
         {fieldErrors.password && (
-          <p className="flex items-center gap-1 text-xs font-medium text-red-600">
+          <p id="password-error" className="flex items-center gap-1 text-xs font-medium text-destructive">
             <AlertCircle className="h-3.5 w-3.5 shrink-0" />
             {fieldErrors.password}
           </p>
@@ -352,11 +361,11 @@ export function RegisterForm() {
 
       {/* Confirm Password Field */}
       <div className="space-y-2">
-        <Label htmlFor="confirm_password" className="block text-sm font-semibold text-gray-700">
+        <Label htmlFor="confirm_password" className="block text-sm font-semibold">
           Confirm Password
         </Label>
         <div className="relative">
-          <Lock className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-gray-400" />
+          <Lock className="absolute left-3.5 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
           <Input
             id="confirm_password"
             type={showConfirmPassword ? 'text' : 'password'}
@@ -364,17 +373,19 @@ export function RegisterForm() {
             value={formData.confirm_password}
             onChange={(e) => handleInputChange('confirm_password', e.target.value)}
             disabled={loading}
-            className={`h-12 rounded-lg border bg-white pl-10 pr-12 outline-none transition-all ${
+            aria-invalid={!!fieldErrors.confirm_password}
+            aria-describedby={fieldErrors.confirm_password ? 'confirm_password-error' : undefined}
+            className={`h-12 pl-10 pr-12 transition-all ${
               fieldErrors.confirm_password
-                ? 'border-red-500 focus-visible:ring-1 focus-visible:ring-red-500'
-                : 'border-gray-200 focus-visible:border-orange-500 focus-visible:ring-1 focus-visible:ring-orange-500'
+                ? 'border-destructive focus-visible:ring-destructive'
+                : 'focus-visible:ring-primary'
             }`}
           />
           <button
             type="button"
             aria-label={showConfirmPassword ? 'Hide password confirmation' : 'Show password confirmation'}
             aria-pressed={showConfirmPassword}
-            className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-400 hover:text-orange-600 transition-colors focus:outline-none"
+            className="absolute right-3.5 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground transition-colors focus:outline-none"
             onClick={() => setShowConfirmPassword(!showConfirmPassword)}
           >
             {showConfirmPassword ? <EyeOff className="h-5 w-5" /> : <Eye className="h-5 w-5" />}
@@ -382,7 +393,7 @@ export function RegisterForm() {
         </div>
 
         {fieldErrors.confirm_password && (
-          <p className="flex items-center gap-1 text-xs font-medium text-red-600">
+          <p id="confirm_password-error" className="flex items-center gap-1 text-xs font-medium text-destructive">
             <AlertCircle className="h-3.5 w-3.5 shrink-0" />
             {fieldErrors.confirm_password}
           </p>
@@ -402,7 +413,7 @@ export function RegisterForm() {
       <div className="pt-2">
         <Button
           type="submit"
-          className="w-full h-14 rounded-lg bg-gradient-to-r from-orange-500 to-amber-600 text-white font-semibold text-sm shadow-lg hover:brightness-110 active:scale-[0.98] transition-all flex items-center justify-center gap-2"
+          className="w-full h-12 gradient-rush text-white font-semibold text-sm shadow-rush hover:opacity-95 active:scale-[0.98] transition-all flex items-center justify-center gap-2"
           disabled={loading}
         >
           {loading ? (

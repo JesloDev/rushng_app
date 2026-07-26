@@ -1,22 +1,41 @@
 'use client';
 
+import { useEffect } from 'react';
+import { useRouter } from 'next/navigation';
 import { useAuth } from '@/hooks/useAuth';
-import { redirect } from 'next/navigation';
 
 export default function DashboardPage() {
-  const { user, loading } = useAuth();
+  const { user, loading, isAuthenticated } = useAuth();
+  const router = useRouter();
 
-  if (loading) return null;
+  useEffect(() => {
+    if (loading) return;
 
-  if (!user) {
-    redirect('/login');
-  }
+    if (!isAuthenticated || !user) {
+      router.replace('/login');
+      return;
+    }
 
-  if (user.role === 'provider') {
-    redirect('/dashboard/provider');
-  } else if (user.role === 'admin') {
-    redirect('/dashboard/admin');
-  } else {
-    redirect('/dashboard/customer');
-  }
+    switch (user.role) {
+      case 'provider':
+        router.replace('/dashboard/provider');
+        break;
+      case 'admin':
+        router.replace('/dashboard/admin');
+        break;
+      case 'customer':
+      default:
+        router.replace('/dashboard/customer');
+        break;
+    }
+  }, [user, loading, isAuthenticated, router]);
+
+  return (
+    <div className="min-h-[60vh] flex items-center justify-center">
+      <div className="text-center space-y-3">
+        <div className="h-8 w-8 animate-spin rounded-full border-4 border-orange-500 border-t-transparent mx-auto" />
+        <p className="text-sm font-medium text-muted-foreground">Directing to your dashboard...</p>
+      </div>
+    </div>
+  );
 }

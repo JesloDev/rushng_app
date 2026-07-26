@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useCallback, useMemo } from 'react';
 import Link from 'next/link';
 import { useAuth } from '@/hooks/useAuth';
 import { jobApi } from '@/lib/api';
@@ -10,7 +10,6 @@ import { Badge } from '@/components/ui/badge';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Skeleton } from '@/components/ui/skeleton';
 import { 
-  Package, 
   Clock, 
   CheckCircle2, 
   XCircle,
@@ -30,7 +29,7 @@ interface Job {
   status: string;
   category: string;
   estimated_price: number;
-  final_price: number;
+  final_price?: number;
   address: string;
   created_at: string;
   customer?: {
@@ -47,17 +46,10 @@ export default function MyJobsPage() {
   const [loading, setLoading] = useState(true);
   const [activeTab, setActiveTab] = useState('active');
 
-  useEffect(() => {
-    if (!isAuthenticated) {
-      return;
-    }
-    fetchJobs();
-  }, [isAuthenticated]);
-
-  const fetchJobs = async () => {
+  const fetchJobs = useCallback(async () => {
     try {
       const response = await jobApi.list({ my: true });
-      if (response.data.success) {
+      if (response.data?.success) {
         setJobs(response.data.data.jobs || []);
       }
     } catch (error) {
@@ -65,9 +57,15 @@ export default function MyJobsPage() {
     } finally {
       setLoading(false);
     }
-  };
+  }, []);
 
-  const getFilteredJobs = () => {
+  useEffect(() => {
+    if (isAuthenticated) {
+      fetchJobs();
+    }
+  }, [isAuthenticated, fetchJobs]);
+
+  const filteredJobs = useMemo(() => {
     if (activeTab === 'active') {
       return jobs.filter(j => ['posted', 'assigned', 'in_progress'].includes(j.status));
     }
@@ -78,15 +76,15 @@ export default function MyJobsPage() {
       return jobs.filter(j => j.status === 'cancelled');
     }
     return jobs;
-  };
+  }, [jobs, activeTab]);
 
   const getStatusBadge = (status: string) => {
     const configs: Record<string, { label: string; className: string }> = {
-      posted: { label: 'Open', className: 'bg-blue-100 text-blue-700' },
-      assigned: { label: 'Assigned', className: 'bg-yellow-100 text-yellow-700' },
-      in_progress: { label: 'In Progress', className: 'bg-orange-100 text-orange-700' },
-      completed: { label: 'Completed', className: 'bg-green-100 text-green-700' },
-      cancelled: { label: 'Cancelled', className: 'bg-red-100 text-red-700' },
+      posted: { label: 'Open', className: 'bg-blue-100 text-blue-700 hover:bg-blue-100' },
+      assigned: { label: 'Assigned', className: 'bg-yellow-100 text-yellow-700 hover:bg-yellow-100' },
+      in_progress: { label: 'In Progress', className: 'bg-orange-100 text-orange-700 hover:bg-orange-100' },
+      completed: { label: 'Completed', className: 'bg-green-100 text-green-700 hover:bg-green-100' },
+      cancelled: { label: 'Cancelled', className: 'bg-red-100 text-red-700 hover:bg-red-100' },
     };
     return configs[status] || { label: status, className: 'bg-gray-100 text-gray-700' };
   };
@@ -105,8 +103,6 @@ export default function MyJobsPage() {
       </div>
     );
   }
-
-  const filteredJobs = getFilteredJobs();
 
   return (
     <div className="container mx-auto px-4 py-8">
@@ -181,7 +177,13 @@ export default function MyJobsPage() {
 }
 
 // Job Card Component
-function JobCard({ job, getStatusBadge }: { job: Job; getStatusBadge: (status: string) => { label: string; className: string } }) {
+function JobCard({ 
+  job, 
+  getStatusBadge 
+}: { 
+  job: Job; 
+  getStatusBadge: (status: string) => { label: string; className: string } 
+}) {
   const status = getStatusBadge(job.status);
   const isActive = ['posted', 'assigned', 'in_progress'].includes(job.status);
 
@@ -217,11 +219,13 @@ function JobCard({ job, getStatusBadge }: { job: Job; getStatusBadge: (status: s
                 </div>
               </div>
             </div>
-            <div className="flex items-center gap-2">
-              <Button variant="ghost" size="sm" className="gap-1">
-                {isActive ? 'Track' : 'View'}
+            
+            {/* Replaced nested Button with a styled div element */}
+            <div className="flex items-center gap-2 self-end md:self-center">
+              <div className="inline-flex items-center justify-center rounded-md text-sm font-medium transition-colors text-orange-600 hover:text-orange-700 px-3 py-1.5 gap-1">
+                <span>{isActive ? 'Track' : 'View'}</span>
                 <ArrowRight className="h-4 w-4" />
-              </Button>
+              </div>
             </div>
           </div>
         </CardContent>

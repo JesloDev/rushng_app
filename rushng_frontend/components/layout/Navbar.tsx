@@ -1,9 +1,24 @@
 'use client';
 
+import { useState } from 'react';
 import Link from 'next/link';
-import { usePathname, useRouter } from 'next/navigation';
 import Image from 'next/image';
-import { Menu, X, User, LogOut, Settings, Briefcase, ClipboardList, Home, Search, Users } from 'lucide-react';
+import { usePathname, useRouter } from 'next/navigation';
+import {
+  Menu,
+  X,
+  User,
+  LogOut,
+  Settings,
+  Briefcase,
+  ClipboardList,
+  Home,
+  Search,
+  Users,
+  Package,
+  PlusCircle,
+  Truck,
+} from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import {
   DropdownMenu,
@@ -16,7 +31,6 @@ import {
 import { Avatar, AvatarFallback } from '@/components/ui/avatar';
 import { useAuth } from '@/hooks/useAuth';
 import { useAppStore } from '@/store/app-store';
-import { useState } from 'react';
 
 export function Navbar() {
   const pathname = usePathname();
@@ -24,11 +38,12 @@ export function Navbar() {
   const { user, isAuthenticated, logout } = useAuth();
   const { setView } = useAppStore();
   const [isOpen, setIsOpen] = useState(false);
+  const [logoError, setLogoError] = useState(false);
 
   const navItems = [
     { href: '/', label: 'Home', icon: Home },
-    { href: '/jobs', label: 'Find Jobs', icon: Search },
-    { href: '/providers', label: 'Providers', icon: Users },
+    { href: '/jobs', label: 'Find Jobs & Dispatch', icon: Search },
+    { href: '/providers', label: 'Artisans & Riders', icon: Users },
   ];
 
   const handleLogoClick = () => {
@@ -44,43 +59,49 @@ export function Navbar() {
   };
 
   return (
-    <nav className="sticky top-0 z-50 border-b bg-white/80 backdrop-blur-md shadow-sm">
+    <nav className="sticky top-0 z-50 border-b border-slate-200/80 bg-white/85 backdrop-blur-md shadow-xs">
       <div className="container mx-auto px-4">
         <div className="flex h-16 items-center justify-between">
-          {/* Logo - Clickable to home */}
+          {/* Brand Logo */}
           <button
             onClick={handleLogoClick}
-            className="flex items-center gap-2 transition-opacity hover:opacity-80 group"
-            aria-label="Go to home"
+            className="flex items-center gap-2.5 transition-opacity hover:opacity-85 group"
+            aria-label="Go to home page"
           >
-            <div className="relative h-9 w-9 rounded-lg bg-gradient-to-r from-orange-500 to-amber-600 p-1.5 shadow-md transition-transform group-hover:scale-105">
-              {/* Custom Logo Image */}
-              <Image
-                src="/rushng-logo.png"
-                alt="RUSHNG Logo"
-                width={24}
-                height={24}
-                className="h-6 w-6 object-contain brightness-0 invert"
-                priority
-              />
+            <div className="relative h-9 w-9 rounded-xl bg-gradient-to-r from-orange-500 to-amber-600 p-1.5 shadow-sm transition-transform group-hover:scale-105 shrink-0 flex items-center justify-center">
+              {!logoError ? (
+                <Image
+                  src="/rushng-logo.png"
+                  alt="RUSHNG Logo"
+                  width={24}
+                  height={24}
+                  className="h-6 w-6 object-contain brightness-0 invert"
+                  onError={() => setLogoError(true)}
+                  priority
+                />
+              ) : (
+                <Package className="h-5 w-5 text-white" />
+              )}
             </div>
-            <span className="text-2xl font-bold">
+            <span className="text-2xl font-black tracking-tight">
               <span className="text-orange-500">RUSH</span>
-              <span className="text-gray-700">NG</span>
+              <span className="text-slate-800">NG</span>
             </span>
           </button>
 
-          {/* Desktop Navigation */}
+          {/* Desktop Navigation Links */}
           <div className="hidden md:flex items-center gap-6">
             {navItems.map((item) => {
               const Icon = item.icon;
+              const isActive = pathname === item.href;
               return (
                 <Link
                   key={item.href}
                   href={item.href}
                   className={`flex items-center gap-1.5 text-sm font-medium transition-colors hover:text-orange-500 ${
-                    pathname === item.href ? 'text-orange-500' : 'text-gray-600'
+                    isActive ? 'text-orange-600 font-semibold' : 'text-slate-600'
                   }`}
+                  aria-current={isActive ? 'page' : undefined}
                 >
                   <Icon className="h-4 w-4" />
                   {item.label}
@@ -88,79 +109,97 @@ export function Navbar() {
               );
             })}
 
-            {/* Auth Links */}
+            {/* Post Job / Dispatch Action Button */}
+            <Link href="/jobs/new">
+              <Button
+                variant="outline"
+                size="sm"
+                className="hidden lg:flex gap-1.5 border-orange-200 text-orange-600 hover:bg-orange-50 hover:text-orange-700 font-medium"
+              >
+                <PlusCircle className="h-4 w-4" />
+                Post Request
+              </Button>
+            </Link>
+
+            {/* Desktop Auth Section */}
             {isAuthenticated ? (
-              <div className="flex items-center gap-3">
+              <div className="flex items-center gap-2">
                 <Link href="/jobs/my">
-                  <Button variant="ghost" size="sm" className="gap-1.5 hover:text-orange-500">
-                    <ClipboardList className="h-4 w-4" />
-                    My Jobs
+                  <Button variant="ghost" size="sm" className="gap-1.5 text-slate-700 hover:text-orange-600 hover:bg-orange-50/50">
+                    <ClipboardList className="h-4 w-4 text-orange-500" />
+                    My Deliveries & Jobs
                   </Button>
                 </Link>
+
                 {user?.role === 'provider' && (
                   <Link href="/providers/me">
-                    <Button variant="ghost" size="sm" className="gap-1.5 hover:text-orange-500">
-                      <Briefcase className="h-4 w-4" />
-                      Dashboard
+                    <Button variant="ghost" size="sm" className="gap-1.5 text-slate-700 hover:text-orange-600 hover:bg-orange-50/50">
+                      <Truck className="h-4 w-4 text-orange-500" />
+                      Rider & Artisan Portal
                     </Button>
                   </Link>
                 )}
+
+                {/* Profile Dropdown */}
                 <DropdownMenu>
                   <DropdownMenuTrigger asChild>
-                    <Button variant="ghost" className="relative h-10 w-10 rounded-full hover:bg-orange-50">
-                      <Avatar className="h-9 w-9">
-                        <AvatarFallback className="bg-gradient-to-br from-orange-500 to-amber-600 text-white text-sm font-semibold">
-                          {user?.full_name?.charAt(0) || 'U'}
+                    <Button variant="ghost" className="relative h-9 w-9 rounded-full p-0 hover:ring-2 hover:ring-orange-400 focus-visible:ring-2 focus-visible:ring-orange-500 transition-all">
+                      <Avatar className="h-9 w-9 border border-orange-200">
+                        <AvatarFallback className="bg-gradient-to-br from-orange-500 to-amber-600 text-white text-xs font-bold">
+                          {user?.full_name ? user.full_name.charAt(0).toUpperCase() : 'U'}
                         </AvatarFallback>
                       </Avatar>
                     </Button>
                   </DropdownMenuTrigger>
-                  <DropdownMenuContent align="end" className="w-56">
-                    <DropdownMenuLabel>
-                      <div className="flex flex-col space-y-1">
-                        <p className="text-sm font-medium leading-none">{user?.full_name}</p>
-                        <p className="text-xs leading-none text-muted-foreground">{user?.email}</p>
+                  <DropdownMenuContent align="end" className="w-56 p-1.5 shadow-lg border-slate-200">
+                    <DropdownMenuLabel className="p-2">
+                      <div className="flex flex-col space-y-0.5">
+                        <p className="text-sm font-semibold text-slate-900 truncate">{user?.full_name}</p>
+                        <p className="text-xs text-slate-500 truncate">{user?.email}</p>
+                        <span className="inline-block mt-1 text-[10px] uppercase font-bold tracking-wider px-1.5 py-0.5 bg-orange-100 text-orange-700 rounded w-fit">
+                          {user?.role || 'User'}
+                        </span>
                       </div>
                     </DropdownMenuLabel>
                     <DropdownMenuSeparator />
                     <DropdownMenuItem asChild>
-                      <Link href="/profile" className="cursor-pointer">
-                        <User className="mr-2 h-4 w-4" />
-                        <span>Profile</span>
+                      <Link href="/profile" className="cursor-pointer flex items-center gap-2 rounded-md px-2 py-1.5 text-sm text-slate-700 hover:bg-slate-100">
+                        <User className="h-4 w-4 text-slate-500" />
+                        <span>Profile Settings</span>
                       </Link>
                     </DropdownMenuItem>
                     <DropdownMenuItem asChild>
-                      <Link href="/jobs/my" className="cursor-pointer">
-                        <ClipboardList className="mr-2 h-4 w-4" />
-                        <span>My Jobs</span>
+                      <Link href="/jobs/my" className="cursor-pointer flex items-center gap-2 rounded-md px-2 py-1.5 text-sm text-slate-700 hover:bg-slate-100">
+                        <ClipboardList className="h-4 w-4 text-slate-500" />
+                        <span>My Requests</span>
                       </Link>
                     </DropdownMenuItem>
                     <DropdownMenuItem asChild>
-                      <Link href="/settings" className="cursor-pointer">
-                        <Settings className="mr-2 h-4 w-4" />
-                        <span>Settings</span>
+                      <Link href="/settings" className="cursor-pointer flex items-center gap-2 rounded-md px-2 py-1.5 text-sm text-slate-700 hover:bg-slate-100">
+                        <Settings className="h-4 w-4 text-slate-500" />
+                        <span>Account Preferences</span>
                       </Link>
                     </DropdownMenuItem>
                     <DropdownMenuSeparator />
                     <DropdownMenuItem
-                      className="cursor-pointer text-red-600 focus:text-red-600 hover:bg-red-50"
+                      className="cursor-pointer flex items-center gap-2 rounded-md px-2 py-1.5 text-sm text-red-600 focus:bg-red-50 focus:text-red-700 hover:bg-red-50"
                       onClick={handleLogout}
                     >
-                      <LogOut className="mr-2 h-4 w-4" />
-                      <span>Logout</span>
+                      <LogOut className="h-4 w-4" />
+                      <span>Log Out</span>
                     </DropdownMenuItem>
                   </DropdownMenuContent>
                 </DropdownMenu>
               </div>
             ) : (
-              <div className="flex items-center gap-3">
+              <div className="flex items-center gap-2.5">
                 <Link href="/login">
-                  <Button variant="ghost" size="sm" className="hover:text-orange-500">
-                    Login
+                  <Button variant="ghost" size="sm" className="text-slate-700 hover:text-orange-600 hover:bg-orange-50">
+                    Log In
                   </Button>
                 </Link>
                 <Link href="/register">
-                  <Button className="bg-gradient-to-r from-orange-500 to-amber-600 text-white hover:from-orange-600 hover:to-amber-700 shadow-md hover:shadow-lg transition-all duration-300">
+                  <Button size="sm" className="bg-gradient-to-r from-orange-500 to-amber-600 text-white font-medium hover:from-orange-600 hover:to-amber-700 shadow-sm transition-all duration-200">
                     Get Started
                   </Button>
                 </Link>
@@ -168,28 +207,29 @@ export function Navbar() {
             )}
           </div>
 
-          {/* Mobile Menu Button */}
+          {/* Mobile Menu Toggle */}
           <button
-            className="md:hidden rounded-md p-2 hover:bg-gray-100 transition-colors"
+            className="md:hidden rounded-lg p-2 text-slate-700 hover:bg-slate-100 transition-colors"
             onClick={() => setIsOpen(!isOpen)}
-            aria-label="Toggle menu"
+            aria-label={isOpen ? 'Close menu' : 'Open menu'}
           >
             {isOpen ? <X className="h-6 w-6" /> : <Menu className="h-6 w-6" />}
           </button>
         </div>
 
-        {/* Mobile Navigation */}
+        {/* Mobile Navigation Drawer */}
         {isOpen && (
-          <div className="md:hidden py-4 border-t">
-            <div className="flex flex-col gap-1">
+          <div className="md:hidden py-4 border-t border-slate-100 space-y-3">
+            <div className="flex flex-col space-y-1">
               {navItems.map((item) => {
                 const Icon = item.icon;
+                const isActive = pathname === item.href;
                 return (
                   <Link
                     key={item.href}
                     href={item.href}
-                    className={`flex items-center gap-2 px-3 py-2.5 text-sm font-medium rounded-md transition-colors hover:bg-orange-50 hover:text-orange-500 ${
-                      pathname === item.href ? 'text-orange-500 bg-orange-50' : 'text-gray-600'
+                    className={`flex items-center gap-3 px-3 py-2.5 text-sm font-medium rounded-lg transition-colors ${
+                      isActive ? 'text-orange-600 bg-orange-50' : 'text-slate-700 hover:bg-slate-50'
                     }`}
                     onClick={() => setIsOpen(false)}
                   >
@@ -198,64 +238,87 @@ export function Navbar() {
                   </Link>
                 );
               })}
+            </div>
 
-              <div className="border-t my-2 pt-2">
-                {isAuthenticated ? (
-                  <>
+            <div className="pt-2 border-t border-slate-100">
+              {isAuthenticated ? (
+                <div className="space-y-1">
+                  <div className="px-3 py-2 mb-2 rounded-lg bg-slate-50 flex items-center gap-3">
+                    <Avatar className="h-8 w-8 border border-orange-200">
+                      <AvatarFallback className="bg-orange-500 text-white text-xs font-bold">
+                        {user?.full_name ? user.full_name.charAt(0).toUpperCase() : 'U'}
+                      </AvatarFallback>
+                    </Avatar>
+                    <div className="overflow-hidden">
+                      <p className="text-xs font-semibold text-slate-800 truncate">{user?.full_name}</p>
+                      <p className="text-[10px] text-slate-500 truncate">{user?.email}</p>
+                    </div>
+                  </div>
+
+                  <Link
+                    href="/jobs/new"
+                    className="flex items-center gap-3 px-3 py-2.5 text-sm font-medium rounded-lg text-orange-600 hover:bg-orange-50"
+                    onClick={() => setIsOpen(false)}
+                  >
+                    <PlusCircle className="h-4 w-4" />
+                    Post New Request
+                  </Link>
+
+                  <Link
+                    href="/jobs/my"
+                    className="flex items-center gap-3 px-3 py-2.5 text-sm font-medium rounded-lg text-slate-700 hover:bg-slate-50"
+                    onClick={() => setIsOpen(false)}
+                  >
+                    <ClipboardList className="h-4 w-4" />
+                    My Jobs & Dispatch
+                  </Link>
+
+                  {user?.role === 'provider' && (
                     <Link
-                      href="/jobs/my"
-                      className="flex items-center gap-2 px-3 py-2.5 text-sm font-medium rounded-md hover:bg-orange-50 hover:text-orange-500"
+                      href="/providers/me"
+                      className="flex items-center gap-3 px-3 py-2.5 text-sm font-medium rounded-lg text-slate-700 hover:bg-slate-50"
                       onClick={() => setIsOpen(false)}
                     >
-                      <ClipboardList className="h-4 w-4" />
-                      My Jobs
+                      <Briefcase className="h-4 w-4" />
+                      Rider / Artisan Dashboard
                     </Link>
-                    {user?.role === 'provider' && (
-                      <Link
-                        href="/providers/me"
-                        className="flex items-center gap-2 px-3 py-2.5 text-sm font-medium rounded-md hover:bg-orange-50 hover:text-orange-500"
-                        onClick={() => setIsOpen(false)}
-                      >
-                        <Briefcase className="h-4 w-4" />
-                        Dashboard
-                      </Link>
-                    )}
-                    <Link
-                      href="/profile"
-                      className="flex items-center gap-2 px-3 py-2.5 text-sm font-medium rounded-md hover:bg-orange-50 hover:text-orange-500"
-                      onClick={() => setIsOpen(false)}
-                    >
-                      <User className="h-4 w-4" />
-                      Profile
-                    </Link>
-                    <button
-                      className="flex w-full items-center gap-2 px-3 py-2.5 text-sm font-medium rounded-md text-red-600 hover:bg-red-50"
-                      onClick={handleLogout}
-                    >
-                      <LogOut className="h-4 w-4" />
-                      Logout
-                    </button>
-                  </>
-                ) : (
-                  <>
-                    <Link
-                      href="/login"
-                      className="flex items-center gap-2 px-3 py-2.5 text-sm font-medium rounded-md hover:bg-orange-50 hover:text-orange-500"
-                      onClick={() => setIsOpen(false)}
-                    >
-                      <User className="h-4 w-4" />
-                      Login
-                    </Link>
-                    <Link
-                      href="/register"
-                      className="mt-2 flex w-full items-center justify-center gap-2 rounded-md bg-gradient-to-r from-orange-500 to-amber-600 px-3 py-2.5 text-sm font-medium text-white hover:from-orange-600 hover:to-amber-700 transition-all duration-300"
-                      onClick={() => setIsOpen(false)}
-                    >
-                      Get Started
-                    </Link>
-                  </>
-                )}
-              </div>
+                  )}
+
+                  <Link
+                    href="/profile"
+                    className="flex items-center gap-3 px-3 py-2.5 text-sm font-medium rounded-lg text-slate-700 hover:bg-slate-50"
+                    onClick={() => setIsOpen(false)}
+                  >
+                    <User className="h-4 w-4" />
+                    Profile Settings
+                  </Link>
+
+                  <button
+                    className="flex w-full items-center gap-3 px-3 py-2.5 text-sm font-medium rounded-lg text-red-600 hover:bg-red-50 transition-colors"
+                    onClick={handleLogout}
+                  >
+                    <LogOut className="h-4 w-4" />
+                    Log Out
+                  </button>
+                </div>
+              ) : (
+                <div className="flex flex-col gap-2 pt-1">
+                  <Link
+                    href="/login"
+                    className="flex items-center justify-center gap-2 px-3 py-2.5 text-sm font-medium rounded-lg text-slate-700 hover:bg-slate-100 border border-slate-200"
+                    onClick={() => setIsOpen(false)}
+                  >
+                    Log In
+                  </Link>
+                  <Link
+                    href="/register"
+                    className="flex items-center justify-center gap-2 px-3 py-2.5 text-sm font-semibold rounded-lg bg-gradient-to-r from-orange-500 to-amber-600 text-white shadow-xs"
+                    onClick={() => setIsOpen(false)}
+                  >
+                    Get Started
+                  </Link>
+                </div>
+              )}
             </div>
           </div>
         )}
