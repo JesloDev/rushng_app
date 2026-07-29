@@ -1,311 +1,469 @@
 'use client';
 
-import { useState, useEffect } from 'react';
+import { useEffect, useState } from 'react';
+import { useRouter } from 'next/navigation';
 import { useAuth } from '@/hooks/useAuth';
-import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
+import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Switch } from '@/components/ui/switch';
-import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
-import { ConfirmModal } from '@/components/modals/ConfirmModal';
-import { Loader2, Bell, Lock, User, Moon } from 'lucide-react';
+import { Badge } from '@/components/ui/badge';
+import { 
+  Loader2, 
+  Settings as SettingsIcon,
+  Bell,
+  Moon,
+  Globe,
+  Shield,
+  Key,
+  User,
+  Mail,
+  Phone,
+  AlertTriangle,
+  CheckCircle2,
+  Lock,
+  Smartphone,
+  Eye,
+  EyeOff
+} from 'lucide-react';
 import { toast } from 'sonner';
-import { useTheme } from 'next-themes';
+import { motion } from 'framer-motion';
+import { userApi } from '@/lib/api';
+
+interface PasswordData {
+  current_password: string;
+  new_password: string;
+  confirm_password: string;
+}
+
+interface Preferences {
+  notifications: boolean;
+  darkMode: boolean;
+  emailUpdates: boolean;
+  twoFactor: boolean;
+}
 
 export default function SettingsPage() {
-  const { user, logout, updateProfile } = useAuth();
-  const { theme, setTheme, resolvedTheme } = useTheme();
-
-  const [mounted, setMounted] = useState(false);
-  const [profileLoading, setProfileLoading] = useState(false);
-  const [passwordLoading, setPasswordLoading] = useState(false);
-  const [deleteLoading, setDeleteLoading] = useState(false);
-  const [showDeleteModal, setShowDeleteModal] = useState(false);
-
-  // Profile Form State
-  const [profileData, setProfileData] = useState({
-    full_name: '',
-    email: '',
-  });
-
-  // Password Form State
-  const [passwordData, setPasswordData] = useState({
+  const router = useRouter();
+  const { user, loading, isAuthenticated } = useAuth();
+  const [isLoading, setIsLoading] = useState(false);
+  const [showCurrentPassword, setShowCurrentPassword] = useState(false);
+  const [showNewPassword, setShowNewPassword] = useState(false);
+  const [showConfirmPassword, setShowConfirmPassword] = useState(false);
+  const [passwordData, setPasswordData] = useState<PasswordData>({
     current_password: '',
     new_password: '',
     confirm_password: '',
   });
+  const [preferences, setPreferences] = useState<Preferences>({
+    notifications: true,
+    darkMode: false,
+    emailUpdates: true,
+    twoFactor: false,
+  });
+  const [securitySettings, setSecuritySettings] = useState({
+    twoFactorEnabled: false,
+    lastLogin: '',
+    devices: 0,
+  });
 
-  // Sync profile state when user object loads
   useEffect(() => {
-    setMounted(true);
-    if (user) {
-      setProfileData({
-        full_name: user.full_name || '',
-        email: user.email || '',
-      });
-    }
-  }, [user]);
-
-  const handleProfileUpdate = async (e: React.FormEvent) => {
-    e.preventDefault();
-    setProfileLoading(true);
-    try {
-      if (updateProfile) {
-        await updateProfile(profileData);
-      }
-      toast.success('Profile updated successfully');
-    } catch (error) {
-      toast.error('Failed to update profile');
-    } finally {
-      setProfileLoading(false);
-    }
-  };
-
-  const handlePasswordChange = async (e: React.FormEvent) => {
-    e.preventDefault();
-
-    if (passwordData.new_password.length < 8) {
-      toast.error('New password must be at least 8 characters long');
+    if (!loading && !isAuthenticated) {
+      router.push('/login');
       return;
     }
 
+    if (user) {
+      fetchSecuritySettings();
+    }
+  }, [loading, isAuthenticated, router, user]);
+
+  const fetchSecuritySettings = async () => {
+    try {
+      const response = await userApi.getSecuritySettings();
+      if (response.data?.success) {
+        const data = response.data.data;
+        setSecuritySettings({
+          twoFactorEnabled: data.twoFactorEnabled || false,
+          lastLogin: data.lastLogin || '',
+          devices: data.devices || 0,
+        });
+        setPreferences({
+          ...preferences,
+          twoFactor: data.twoFactorEnabled || false,
+        });
+      }
+    } catch (error) {
+      console.error('Failed to fetch security settings:', error);
+    }
+  };
+
+  if (loading || !isAuthenticated) {
+    return (
+      <div className="min-h-[60vh] flex items-center justify-center">
+        <Loader2 className="h-8 w-8 animate-spin text-orange-500" />
+      </div>
+    );
+  }
+
+  const handlePasswordChange = async (e: React.FormEvent) => {
+    e.preventDefault();
+    
     if (passwordData.new_password !== passwordData.confirm_password) {
       toast.error('Passwords do not match');
       return;
     }
 
-    setPasswordLoading(true);
+    if (passwordData.new_password.length < 8) {
+      toast.error('Password must be at least 8 characters');
+      return;
+    }
+
+    setIsLoading(true);
     try {
-      // Replace with your API endpoint call
-      // await userApi.changePassword(passwordData);
-      toast.success('Password changed successfully');
-      setPasswordData({ current_password: '', new_password: '', confirm_password: '' });
-    } catch (error) {
-      toast.error('Failed to change password');
+      const response = await userApi.changePassword({
+        current_password: passwordData.current_password,
+        new_password: passwordData.new_password,
+      });
+      
+      if (response.data?.success) {
+        toast.success('Password changed successfully!');
+        setPasswordData({
+          current_password: '',
+          new_password: '',
+          confirm_password: '',
+        });
+      } else {
+        toast.error(response.data?.message || 'Failed to change password');
+      }
+    } catch (error: any) {
+      toast.error(error.response?.data?.message || 'Failed to change password');
     } finally {
-      setPasswordLoading(false);
+      setIsLoading(false);
     }
   };
 
-  const handleDeleteAccount = async () => {
-    setDeleteLoading(true);
+  const handlePreferenceChange = async (key: keyof Preferences, value: boolean) => {
+    setPreferences({ ...preferences, [key]: value });
+    
     try {
-      // Replace with your API endpoint call
-      // await userApi.deleteAccount();
-      toast.success('Account deleted successfully');
-      setShowDeleteModal(false);
-      logout();
+      await userApi.updatePreferences({ [key]: value });
+      toast.success('Preferences updated!');
+      
+      if (key === 'twoFactor') {
+        setSecuritySettings({
+          ...securitySettings,
+          twoFactorEnabled: value,
+        });
+      }
     } catch (error) {
-      toast.error('Failed to delete account');
-    } finally {
-      setDeleteLoading(false);
+      toast.error('Failed to update preferences');
+      // Revert on error
+      setPreferences({ ...preferences, [key]: !value });
     }
   };
 
   return (
-    <div className="container max-w-3xl mx-auto px-4 py-8">
-      <h1 className="text-2xl font-bold mb-6">Settings</h1>
+    <div className="container max-w-4xl mx-auto px-4 py-8">
+      <motion.div
+        initial={{ opacity: 0, y: 20 }}
+        animate={{ opacity: 1, y: 0 }}
+        className="space-y-6"
+      >
+        {/* Header */}
+        <div>
+          <h1 className="text-3xl font-bold tracking-tight flex items-center gap-2">
+            <SettingsIcon className="h-8 w-8 text-orange-500" />
+            Settings
+          </h1>
+          <p className="text-muted-foreground">Manage your account preferences and security</p>
+        </div>
 
-      <Tabs defaultValue="profile" className="space-y-6">
-        <TabsList className="grid w-full grid-cols-4">
-          <TabsTrigger value="profile" className="gap-2">
-            <User className="h-4 w-4" />
-            <span className="hidden sm:inline">Profile</span>
-          </TabsTrigger>
-          <TabsTrigger value="security" className="gap-2">
-            <Lock className="h-4 w-4" />
-            <span className="hidden sm:inline">Security</span>
-          </TabsTrigger>
-          <TabsTrigger value="notifications" className="gap-2">
-            <Bell className="h-4 w-4" />
-            <span className="hidden sm:inline">Notifications</span>
-          </TabsTrigger>
-          <TabsTrigger value="appearance" className="gap-2">
-            <Moon className="h-4 w-4" />
-            <span className="hidden sm:inline">Appearance</span>
-          </TabsTrigger>
-        </TabsList>
-
-        {/* Profile Tab */}
-        <TabsContent value="profile">
-          <Card>
-            <CardHeader>
-              <CardTitle>Profile Settings</CardTitle>
-              <CardDescription>Update your personal display information.</CardDescription>
-            </CardHeader>
-            <CardContent>
-              <form onSubmit={handleProfileUpdate} className="space-y-4">
-                <div className="space-y-2">
-                  <Label htmlFor="full_name">Full Name</Label>
-                  <Input
-                    id="full_name"
-                    value={profileData.full_name}
-                    onChange={(e) => setProfileData({ ...profileData, full_name: e.target.value })}
-                    placeholder="Enter your full name"
-                    required
-                  />
+        {/* Account Settings */}
+        <Card className="border-border/50 shadow-lg">
+          <CardHeader>
+            <CardTitle className="flex items-center gap-2">
+              <User className="h-5 w-5 text-orange-500" />
+              Account Information
+            </CardTitle>
+          </CardHeader>
+          <CardContent className="space-y-4">
+            <div className="flex items-center justify-between p-3 rounded-lg bg-muted/30">
+              <div className="flex items-center gap-3">
+                <Mail className="h-4 w-4 text-muted-foreground" />
+                <div>
+                  <p className="text-sm font-medium">Email</p>
+                  <p className="text-xs text-muted-foreground">{user?.email}</p>
                 </div>
-                <div className="space-y-2">
-                  <Label htmlFor="email">Email</Label>
-                  <Input
-                    id="email"
-                    type="email"
-                    value={profileData.email}
-                    onChange={(e) => setProfileData({ ...profileData, email: e.target.value })}
-                    placeholder="Enter your email"
-                    required
-                  />
+              </div>
+              <Badge variant="success">
+                {user?.is_verified ? 'Verified' : 'Not Verified'}
+              </Badge>
+            </div>
+            <div className="flex items-center justify-between p-3 rounded-lg bg-muted/30">
+              <div className="flex items-center gap-3">
+                <Phone className="h-4 w-4 text-muted-foreground" />
+                <div>
+                  <p className="text-sm font-medium">Phone</p>
+                  <p className="text-xs text-muted-foreground">{user?.phone || 'Not set'}</p>
                 </div>
-                <Button type="submit" className="bg-orange-500 hover:bg-orange-600 text-white" disabled={profileLoading}>
-                  {profileLoading && <Loader2 className="h-4 w-4 animate-spin mr-2" />}
-                  Save Changes
-                </Button>
-              </form>
-            </CardContent>
-          </Card>
-        </TabsContent>
+              </div>
+              <Badge variant={user?.phone ? 'success' : 'secondary'}>
+                {user?.phone ? 'Verified' : 'Not set'}
+              </Badge>
+            </div>
+            <div className="flex items-center justify-between p-3 rounded-lg bg-muted/30">
+              <div className="flex items-center gap-3">
+                <Shield className="h-4 w-4 text-muted-foreground" />
+                <div>
+                  <p className="text-sm font-medium">Account Type</p>
+                  <p className="text-xs text-muted-foreground capitalize">{user?.role || 'User'}</p>
+                </div>
+              </div>
+              <Badge variant={user?.is_active ? 'success' : 'destructive'}>
+                {user?.is_active ? 'Active' : 'Inactive'}
+              </Badge>
+            </div>
+            {user?.role === 'provider' && (
+              <div className="flex items-center justify-between p-3 rounded-lg bg-muted/30">
+                <div className="flex items-center gap-3">
+                  <Award className="h-4 w-4 text-muted-foreground" />
+                  <div>
+                    <p className="text-sm font-medium">Verification Level</p>
+                    <p className="text-xs text-muted-foreground capitalize">N/A</p>
+                  </div>
+                </div>
+                <Badge variant="secondary">Basic</Badge>
+              </div>
+            )}
+          </CardContent>
+        </Card>
 
-        {/* Security Tab */}
-        <TabsContent value="security">
-          <Card>
-            <CardHeader>
-              <CardTitle>Security Settings</CardTitle>
-              <CardDescription>Manage your password and security credentials.</CardDescription>
-            </CardHeader>
-            <CardContent className="space-y-6">
-              <form onSubmit={handlePasswordChange} className="space-y-4">
-                <div className="space-y-2">
-                  <Label htmlFor="current_password">Current Password</Label>
+        {/* Security - Change Password */}
+        <Card className="border-border/50 shadow-lg">
+          <CardHeader>
+            <CardTitle className="flex items-center gap-2">
+              <Key className="h-5 w-5 text-orange-500" />
+              Change Password
+            </CardTitle>
+          </CardHeader>
+          <CardContent>
+            <form onSubmit={handlePasswordChange} className="space-y-4">
+              <div className="space-y-2">
+                <Label htmlFor="current_password">Current Password</Label>
+                <div className="relative">
+                  <Lock className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
                   <Input
                     id="current_password"
-                    type="password"
+                    type={showCurrentPassword ? 'text' : 'password'}
                     value={passwordData.current_password}
-                    onChange={(e) => setPasswordData({ ...passwordData, current_password: e.target.value })}
+                    onChange={(e) => setPasswordData({
+                      ...passwordData,
+                      current_password: e.target.value
+                    })}
                     required
+                    className="h-10 pl-10 pr-10"
                   />
+                  <button
+                    type="button"
+                    onClick={() => setShowCurrentPassword(!showCurrentPassword)}
+                    className="absolute right-3 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground"
+                  >
+                    {showCurrentPassword ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
+                  </button>
                 </div>
-                <div className="space-y-2">
-                  <Label htmlFor="new_password">New Password</Label>
+              </div>
+              <div className="space-y-2">
+                <Label htmlFor="new_password">New Password</Label>
+                <div className="relative">
+                  <Lock className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
                   <Input
                     id="new_password"
-                    type="password"
+                    type={showNewPassword ? 'text' : 'password'}
                     value={passwordData.new_password}
-                    onChange={(e) => setPasswordData({ ...passwordData, new_password: e.target.value })}
+                    onChange={(e) => setPasswordData({
+                      ...passwordData,
+                      new_password: e.target.value
+                    })}
                     required
+                    className="h-10 pl-10 pr-10"
                   />
+                  <button
+                    type="button"
+                    onClick={() => setShowNewPassword(!showNewPassword)}
+                    className="absolute right-3 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground"
+                  >
+                    {showNewPassword ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
+                  </button>
                 </div>
-                <div className="space-y-2">
-                  <Label htmlFor="confirm_password">Confirm Password</Label>
+                <p className="text-xs text-muted-foreground">Must be at least 8 characters</p>
+              </div>
+              <div className="space-y-2">
+                <Label htmlFor="confirm_password">Confirm New Password</Label>
+                <div className="relative">
+                  <Lock className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
                   <Input
                     id="confirm_password"
-                    type="password"
+                    type={showConfirmPassword ? 'text' : 'password'}
                     value={passwordData.confirm_password}
-                    onChange={(e) => setPasswordData({ ...passwordData, confirm_password: e.target.value })}
+                    onChange={(e) => setPasswordData({
+                      ...passwordData,
+                      confirm_password: e.target.value
+                    })}
                     required
+                    className="h-10 pl-10 pr-10"
                   />
+                  <button
+                    type="button"
+                    onClick={() => setShowConfirmPassword(!showConfirmPassword)}
+                    className="absolute right-3 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground"
+                  >
+                    {showConfirmPassword ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
+                  </button>
                 </div>
-                <Button type="submit" className="bg-orange-500 hover:bg-orange-600 text-white" disabled={passwordLoading}>
-                  {passwordLoading && <Loader2 className="h-4 w-4 animate-spin mr-2" />}
-                  Change Password
-                </Button>
-              </form>
-
-              <div className="border-t pt-6">
-                <h3 className="font-semibold text-red-600 mb-1">Danger Zone</h3>
-                <p className="text-sm text-muted-foreground mb-4">
-                  Permanently delete your account and all associated data.
-                </p>
-                <Button variant="destructive" onClick={() => setShowDeleteModal(true)}>
-                  Delete Account
-                </Button>
+                {passwordData.confirm_password && passwordData.new_password === passwordData.confirm_password && (
+                  <p className="text-xs text-emerald-600 flex items-center gap-1">
+                    <CheckCircle2 className="h-3 w-3" />
+                    Passwords match
+                  </p>
+                )}
               </div>
-            </CardContent>
-          </Card>
-        </TabsContent>
+              <Button
+                type="submit"
+                disabled={isLoading}
+                className="gradient-rush text-white"
+              >
+                {isLoading ? (
+                  <>
+                    <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+                    Updating...
+                  </>
+                ) : (
+                  'Update Password'
+                )}
+              </Button>
+            </form>
+          </CardContent>
+        </Card>
 
-        {/* Notifications Tab */}
-        <TabsContent value="notifications">
-          <Card>
-            <CardHeader>
-              <CardTitle>Notification Preferences</CardTitle>
-              <CardDescription>Choose what updates you want to receive.</CardDescription>
-            </CardHeader>
-            <CardContent className="space-y-4">
-              <div className="flex justify-between items-center">
+        {/* Security Settings */}
+        <Card className="border-border/50 shadow-lg">
+          <CardHeader>
+            <CardTitle className="flex items-center gap-2">
+              <Shield className="h-5 w-5 text-orange-500" />
+              Security Settings
+            </CardTitle>
+          </CardHeader>
+          <CardContent className="space-y-4">
+            <div className="flex items-center justify-between p-3 rounded-lg bg-muted/30">
+              <div className="flex items-center gap-3">
+                <Smartphone className="h-4 w-4 text-muted-foreground" />
                 <div>
-                  <p className="font-medium">Job Updates</p>
-                  <p className="text-sm text-muted-foreground">Get notified about job status changes</p>
+                  <p className="text-sm font-medium">Two-Factor Authentication</p>
+                  <p className="text-xs text-muted-foreground">
+                    {securitySettings.twoFactorEnabled ? 'Enabled' : 'Disabled'}
+                  </p>
                 </div>
-                <Switch defaultChecked />
               </div>
-              <div className="flex justify-between items-center">
+              <Switch
+                checked={preferences.twoFactor}
+                onCheckedChange={(checked) => handlePreferenceChange('twoFactor', checked)}
+              />
+            </div>
+            <div className="flex items-center justify-between p-3 rounded-lg bg-muted/30">
+              <div className="flex items-center gap-3">
+                <Clock className="h-4 w-4 text-muted-foreground" />
                 <div>
-                  <p className="font-medium">Payment Notifications</p>
-                  <p className="text-sm text-muted-foreground">Payment confirmations and updates</p>
+                  <p className="text-sm font-medium">Last Login</p>
+                  <p className="text-xs text-muted-foreground">
+                    {securitySettings.lastLogin || 'N/A'}
+                  </p>
                 </div>
-                <Switch defaultChecked />
               </div>
-              <div className="flex justify-between items-center">
+            </div>
+            <div className="flex items-center justify-between p-3 rounded-lg bg-muted/30">
+              <div className="flex items-center gap-3">
+                <Smartphone className="h-4 w-4 text-muted-foreground" />
                 <div>
-                  <p className="font-medium">Marketing Emails</p>
-                  <p className="text-sm text-muted-foreground">Promotions and offers</p>
+                  <p className="text-sm font-medium">Active Devices</p>
+                  <p className="text-xs text-muted-foreground">
+                    {securitySettings.devices || 0} devices
+                  </p>
                 </div>
-                <Switch />
               </div>
-            </CardContent>
-          </Card>
-        </TabsContent>
+            </div>
+          </CardContent>
+        </Card>
 
-        {/* Appearance Tab */}
-        <TabsContent value="appearance">
-          <Card>
-            <CardHeader>
-              <CardTitle>Appearance</CardTitle>
-              <CardDescription>Customize the theme and visual experience.</CardDescription>
-            </CardHeader>
-            <CardContent className="space-y-4">
-              {mounted ? (
-                <>
-                  <div className="flex justify-between items-center">
-                    <div>
-                      <p className="font-medium">Dark Mode</p>
-                      <p className="text-sm text-muted-foreground">Switch between light and dark theme</p>
-                    </div>
-                    <Switch
-                      checked={resolvedTheme === 'dark'}
-                      onCheckedChange={(checked) => setTheme(checked ? 'dark' : 'light')}
-                    />
-                  </div>
-                  <div className="flex justify-between items-center">
-                    <div>
-                      <p className="font-medium">System Theme</p>
-                      <p className="text-sm text-muted-foreground">Sync theme with your OS settings</p>
-                    </div>
-                    <Switch
-                      checked={theme === 'system'}
-                      onCheckedChange={(checked) => setTheme(checked ? 'system' : resolvedTheme || 'light')}
-                    />
-                  </div>
-                </>
-              ) : (
-                <div className="py-4 text-sm text-muted-foreground">Loading theme preferences...</div>
-              )}
-            </CardContent>
-          </Card>
-        </TabsContent>
-      </Tabs>
+        {/* Preferences */}
+        <Card className="border-border/50 shadow-lg">
+          <CardHeader>
+            <CardTitle className="flex items-center gap-2">
+              <Bell className="h-5 w-5 text-orange-500" />
+              Preferences
+            </CardTitle>
+          </CardHeader>
+          <CardContent className="space-y-4">
+            <div className="flex items-center justify-between p-3 rounded-lg bg-muted/30">
+              <div className="flex items-center gap-3">
+                <Bell className="h-4 w-4 text-muted-foreground" />
+                <div>
+                  <p className="text-sm font-medium">Notifications</p>
+                  <p className="text-xs text-muted-foreground">Receive job notifications</p>
+                </div>
+              </div>
+              <Switch
+                checked={preferences.notifications}
+                onCheckedChange={(checked) => handlePreferenceChange('notifications', checked)}
+              />
+            </div>
+            <div className="flex items-center justify-between p-3 rounded-lg bg-muted/30">
+              <div className="flex items-center gap-3">
+                <Globe className="h-4 w-4 text-muted-foreground" />
+                <div>
+                  <p className="text-sm font-medium">Email Updates</p>
+                  <p className="text-xs text-muted-foreground">Receive promotional emails</p>
+                </div>
+              </div>
+              <Switch
+                checked={preferences.emailUpdates}
+                onCheckedChange={(checked) => handlePreferenceChange('emailUpdates', checked)}
+              />
+            </div>
+          </CardContent>
+        </Card>
 
-      {/* Delete Account Modal */}
-      <ConfirmModal
-        open={showDeleteModal}
-        onOpenChange={setShowDeleteModal}
-        title="Delete Account"
-        description="Are you sure you want to delete your account? This action cannot be undone and all your data will be permanently removed."
-        onConfirm={handleDeleteAccount}
-        variant="destructive"
-        confirmLabel={deleteLoading ? "Deleting..." : "Delete Account"}
-      />
+        {/* Danger Zone */}
+        <Card className="border-destructive/50 border-2 shadow-lg">
+          <CardHeader>
+            <CardTitle className="flex items-center gap-2 text-destructive">
+              <AlertTriangle className="h-5 w-5" />
+              Danger Zone
+            </CardTitle>
+          </CardHeader>
+          <CardContent>
+            <div className="flex items-center justify-between p-3 rounded-lg bg-destructive/5">
+              <div>
+                <p className="text-sm font-medium">Delete Account</p>
+                <p className="text-xs text-muted-foreground">Permanently delete your account and all data</p>
+              </div>
+              <Button 
+                variant="destructive" 
+                size="sm"
+                onClick={() => {
+                  if (confirm('Are you sure you want to delete your account? This action cannot be undone.')) {
+                    // Handle account deletion
+                    toast.error('Account deletion is not available yet');
+                  }
+                }}
+              >
+                Delete Account
+              </Button>
+            </div>
+          </CardContent>
+        </Card>
+      </motion.div>
     </div>
   );
 }

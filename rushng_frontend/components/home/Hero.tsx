@@ -1,164 +1,273 @@
 'use client';
 
 import { Button } from '@/components/ui/button';
-import { ArrowRight, Star, Briefcase, CheckCircle2 } from 'lucide-react';
+import { ArrowRight, Star, Briefcase, CheckCircle2, Sparkles, Zap, Shield } from 'lucide-react';
 import Link from 'next/link';
 import { motion } from 'framer-motion';
+import { useState, useEffect } from 'react';
 
 export function Hero() {
+  const [currentProviderIndex, setCurrentProviderIndex] = useState(0);
+  
   const sampleProviders = [
-    { name: 'Chidi E.', service: 'Plumbing & Dispatch', rating: 4.9, distance: '2.3km' },
-    { name: 'Amina B.', service: 'Electrical Maintenance', rating: 4.8, distance: '3.1km' },
-    { name: 'Tunde O.', service: 'Carpentry & Logistics', rating: 4.7, distance: '1.8km' },
+    { name: 'Chidi E.', service: 'Plumbing & Dispatch', rating: 4.9, distance: '2.3km', verified: true },
+    { name: 'Amina B.', service: 'Electrical Maintenance', rating: 4.8, distance: '3.1km', verified: true },
+    { name: 'Tunde O.', service: 'Carpentry & Logistics', rating: 4.7, distance: '1.8km', verified: true },
+    { name: 'Ngozi O.', service: 'Cleaning Services', rating: 4.9, distance: '0.9km', verified: true },
+    { name: 'Segun A.', service: 'Painting & Decor', rating: 4.6, distance: '2.7km', verified: true },
   ];
 
+  // Auto-rotate providers
+  useEffect(() => {
+    const interval = setInterval(() => {
+      setCurrentProviderIndex((prev) => (prev + 1) % sampleProviders.length);
+    }, 4000);
+    return () => clearInterval(interval);
+  }, [sampleProviders.length]);
+
+  const currentProvider = sampleProviders[currentProviderIndex];
+
   return (
-    <section className="relative overflow-hidden bg-gradient-to-b from-primary/5 via-background to-background pt-16 md:pt-24 pb-24 md:pb-32">
-      {/* Background Glow Decorations */}
+    <section className="relative overflow-hidden bg-gradient-to-br from-orange-50/50 via-background to-amber-50/30 dark:from-orange-950/20 dark:via-background dark:to-amber-950/10 pt-20 md:pt-28 pb-24 md:pb-32">
+      {/* Animated Background Decorations */}
       <div className="absolute inset-0 -z-10 overflow-hidden" aria-hidden="true">
-        <div className="absolute -top-24 -right-24 h-[500px] w-[500px] rounded-full bg-primary/10 blur-3xl pointer-events-none" />
-        <div className="absolute top-1/2 -left-24 h-[400px] w-[400px] rounded-full bg-amber-500/10 blur-3xl pointer-events-none" />
+        <div className="absolute -top-40 -right-40 h-[600px] w-[600px] rounded-full bg-orange-500/10 blur-3xl animate-pulse-slow" />
+        <div className="absolute top-1/2 -left-40 h-[500px] w-[500px] rounded-full bg-amber-500/10 blur-3xl animate-pulse-slow animation-delay-1000" />
+        <div className="absolute bottom-0 right-1/4 h-[300px] w-[300px] rounded-full bg-primary/5 blur-3xl" />
+        
+        {/* Grid Pattern Overlay */}
+        <div className="absolute inset-0 bg-grid opacity-30 dark:opacity-20" />
       </div>
 
-      <div className="container mx-auto px-4 md:px-6">
+      <div className="container mx-auto px-4 md:px-6 relative">
         <div className="grid lg:grid-cols-2 gap-12 lg:gap-8 items-center">
           
           {/* Left Hero Content */}
           <motion.div
-            initial={{ opacity: 0, y: 20 }}
+            initial={{ opacity: 0, y: 30 }}
             animate={{ opacity: 1, y: 0 }}
-            transition={{ duration: 0.5 }}
+            transition={{ duration: 0.6, ease: "easeOut" }}
             className="space-y-6 text-left"
           >
-            {/* Live Availability Badge */}
-           {/* <div className="inline-flex items-center gap-2 rounded-full border border-primary/20 bg-primary/10 px-4 py-1.5 text-xs md:text-sm font-semibold text-primary">
-              <span className="relative flex h-2 w-2">
-                <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-primary opacity-75" />
-                <span className="relative inline-flex rounded-full h-2 w-2 bg-primary" />
-              </span>
-              Available 24/7 Across Nigeria
-            </div>*/}
+            {/* Trust Badge - Replaces "Available 24/7" */}
+            <motion.div
+              initial={{ opacity: 0, scale: 0.9 }}
+              animate={{ opacity: 1, scale: 1 }}
+              transition={{ delay: 0.2, duration: 0.4 }}
+              className="inline-flex items-center gap-2 rounded-full border border-primary/20 bg-primary/10 dark:bg-primary/20 backdrop-blur-sm px-4 py-1.5 text-xs md:text-sm font-semibold text-primary shadow-sm"
+            >
+              <Sparkles className="h-3.5 w-3.5" />
+              <span>Trusted by 50,000+ Nigerians</span>
+              <span className="w-1 h-1 rounded-full bg-primary/30" />
+              <Shield className="h-3.5 w-3.5" />
+              <span className="hidden sm:inline">100% Verified</span>
+            </motion.div>
 
-            {/* Headline */}
-            <h1 className="text-4xl md:text-6xl font-extrabold tracking-tight leading-[1.15]">
+            {/* Headline with Gradient */}
+            <motion.h1 
+              className="text-4xl md:text-5xl lg:text-6xl xl:text-7xl font-extrabold tracking-tight leading-[1.1]"
+              initial={{ opacity: 0, y: 20 }}
+              animate={{ opacity: 1, y: 0 }}
+              transition={{ delay: 0.1, duration: 0.5 }}
+            >
               Find Trusted{' '}
-              <span className="bg-gradient-to-r from-orange-500 via-amber-500 to-amber-600 bg-clip-text text-transparent">
+              <span className="bg-gradient-to-r from-orange-500 via-amber-500 to-orange-600 bg-clip-text text-transparent relative">
                 Service Providers
-              </span>{' '}
-              & Logistics Near You
-            </h1>
+                <motion.span 
+                  className="absolute -bottom-2 left-0 right-0 h-1 bg-gradient-to-r from-orange-500 to-amber-500 rounded-full"
+                  initial={{ scaleX: 0 }}
+                  animate={{ scaleX: 1 }}
+                  transition={{ delay: 0.6, duration: 0.6 }}
+                />
+              </span>
+              <br />
+              <span className="text-foreground">Near You</span>
+            </motion.h1>
 
             {/* Description */}
-            <p className="text-base md:text-lg text-muted-foreground max-w-xl leading-relaxed">
+            <motion.p 
+              className="text-base md:text-lg text-muted-foreground max-w-xl leading-relaxed"
+              initial={{ opacity: 0 }}
+              animate={{ opacity: 1 }}
+              transition={{ delay: 0.3, duration: 0.5 }}
+            >
               Connect with verified dispatch riders, plumbers, electricians, and technicians. 
               Get quality, reliable service delivered straight to your doorstep.
-            </p>
+            </motion.p>
 
             {/* Action Buttons */}
-            <div className="flex flex-wrap items-center gap-4 pt-2">
-              <Button 
-                asChild 
-                size="lg" 
-                className="gradient-rush text-white font-semibold shadow-rush hover:opacity-95 h-12 px-6"
-              >
-                <Link href="/jobs" className="flex items-center gap-2">
+            <motion.div 
+              className="flex flex-wrap items-center gap-4 pt-2"
+              initial={{ opacity: 0, y: 20 }}
+              animate={{ opacity: 1, y: 0 }}
+              transition={{ delay: 0.4, duration: 0.5 }}
+            >
+              <Link href="/jobs" className="flex items-center gap-2">
+                <Button 
+                  size="lg" 
+                  className="gradient-rush text-white font-semibold shadow-brand hover:shadow-brand-lg hover:scale-[1.02] active:scale-[0.98] transition-all duration-200 h-12 px-6"
+                >
                   Find a Service
                   <ArrowRight className="h-4 w-4" />
-                </Link>
-              </Button>
+                </Button>
+              </Link>
 
-              <Button 
-                asChild 
-                size="lg" 
-                variant="outline" 
-                className="h-12 px-6 border-border hover:bg-accent font-medium"
-              >
-                <Link href="/providers/register">
+              <Link href="/providers/register">
+                <Button 
+                  size="lg" 
+                  variant="outline" 
+                  className="h-12 px-6 border-2 hover:border-primary/50 hover:bg-primary/5 transition-all duration-200 font-medium"
+                >
                   Become a Provider
-                </Link>
-              </Button>
-            </div>
+                </Button>
+              </Link>
+            </motion.div>
 
-            {/* Social Proof / Key Metrics */}
-            <div className="grid grid-cols-3 gap-4 pt-8 border-t border-border/60">
-              <div>
-                <div className="text-2xl md:text-3xl font-bold tracking-tight text-primary">10K+</div>
-                <div className="text-xs md:text-sm text-muted-foreground font-medium">Verified Providers</div>
-              </div>
-              <div>
-                <div className="text-2xl md:text-3xl font-bold tracking-tight text-primary">50K+</div>
-                <div className="text-xs md:text-sm text-muted-foreground font-medium">Jobs Delivered</div>
-              </div>
-              <div>
-                <div className="text-2xl md:text-3xl font-bold tracking-tight text-primary">4.8★</div>
-                <div className="text-xs md:text-sm text-muted-foreground font-medium">Average Rating</div>
-              </div>
-            </div>
+            {/* Social Proof / Key Metrics with Icons */}
+            <motion.div 
+              className="grid grid-cols-3 gap-4 pt-8 border-t border-border/60"
+              initial={{ opacity: 0 }}
+              animate={{ opacity: 1 }}
+              transition={{ delay: 0.5, duration: 0.5 }}
+            >
+              {[
+                { value: '10K+', label: 'Verified Providers', icon: Briefcase },
+                { value: '50K+', label: 'Jobs Delivered', icon: CheckCircle2 },
+                { value: '4.8★', label: 'Average Rating', icon: Star },
+              ].map((stat, idx) => (
+                <motion.div 
+                  key={stat.label}
+                  initial={{ opacity: 0, y: 10 }}
+                  animate={{ opacity: 1, y: 0 }}
+                  transition={{ delay: 0.6 + idx * 0.1 }}
+                  className="group"
+                >
+                  <div className="text-2xl md:text-3xl font-bold tracking-tight text-primary group-hover:scale-105 transition-transform">
+                    {stat.value}
+                  </div>
+                  <div className="text-xs md:text-sm text-muted-foreground font-medium flex items-center gap-1">
+                    <stat.icon className="h-3 w-3" />
+                    {stat.label}
+                  </div>
+                </motion.div>
+              ))}
+            </motion.div>
           </motion.div>
 
           {/* Right Live Preview Card */}
           <motion.div
-            initial={{ opacity: 0, x: 20 }}
+            initial={{ opacity: 0, x: 30 }}
             animate={{ opacity: 1, x: 0 }}
-            transition={{ duration: 0.5, delay: 0.2 }}
+            transition={{ duration: 0.6, delay: 0.2, ease: "easeOut" }}
             className="relative lg:ml-auto w-full max-w-md lg:max-w-none"
           >
             <div className="relative rounded-2xl overflow-hidden shadow-2xl border border-border/50">
-              <div className="gradient-rush p-6 md:p-8 text-white">
-                <div className="flex items-center gap-3 mb-6">
-                  <div className="flex h-12 w-12 items-center justify-center rounded-xl bg-white/20 backdrop-blur-md shrink-0">
-                    <Briefcase className="h-6 w-6 text-white" />
+              {/* Gradient Background with Animation */}
+              <div className="gradient-rush p-6 md:p-8 text-white relative overflow-hidden">
+                <div className="absolute inset-0 bg-grid-white/10" />
+                <div className="absolute -top-24 -right-24 h-64 w-64 rounded-full bg-white/10 blur-2xl" />
+                <div className="absolute -bottom-24 -left-24 h-64 w-64 rounded-full bg-white/10 blur-2xl" />
+                
+                <div className="relative z-10">
+                  <div className="flex items-center gap-3 mb-6">
+                    <div className="flex h-12 w-12 items-center justify-center rounded-xl bg-white/20 backdrop-blur-md shrink-0 border border-white/10">
+                      <Briefcase className="h-6 w-6 text-white" />
+                    </div>
+                    <div>
+                      <h3 className="font-bold text-lg leading-tight">Nearby Professionals</h3>
+                      <p className="text-xs text-white/80 flex items-center gap-1">
+                        <span className="relative flex h-1.5 w-1.5">
+                          <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-green-400 opacity-75" />
+                          <span className="relative inline-flex rounded-full h-1.5 w-1.5 bg-green-400" />
+                        </span>
+                        Active now in your area
+                      </p>
+                    </div>
                   </div>
-                  <div>
-                    <h3 className="font-bold text-lg leading-tight">Nearby Professionals</h3>
-                    <p className="text-xs text-white/80">Active now in your area</p>
-                  </div>
-                </div>
 
-                {/* Provider List Stack */}
-                <div className="space-y-3">
-                  {sampleProviders.map((provider, index) => (
-                    <div
-                      key={index}
-                      className="flex items-center justify-between rounded-xl bg-white/10 backdrop-blur-md p-3.5 border border-white/10 hover:bg-white/20 transition-all cursor-pointer"
-                    >
-                      <div className="space-y-0.5">
-                        <p className="font-semibold text-sm leading-tight">{provider.name}</p>
-                        <p className="text-xs text-white/80">{provider.service}</p>
+                  {/* Animated Provider Card */}
+                  <motion.div
+                    key={currentProviderIndex}
+                    initial={{ opacity: 0, y: 10 }}
+                    animate={{ opacity: 1, y: 0 }}
+                    exit={{ opacity: 0, y: -10 }}
+                    transition={{ duration: 0.3 }}
+                    className="rounded-xl bg-white/10 backdrop-blur-md p-4 border border-white/10 hover:bg-white/20 transition-all cursor-pointer"
+                  >
+                    <div className="flex items-center justify-between">
+                      <div className="space-y-1">
+                        <div className="flex items-center gap-2">
+                          <p className="font-semibold text-sm leading-tight">{currentProvider.name}</p>
+                          <CheckCircle2 className="h-3.5 w-3.5 text-green-300" />
+                        </div>
+                        <p className="text-xs text-white/80">{currentProvider.service}</p>
                       </div>
                       <div className="text-right">
                         <div className="flex items-center justify-end gap-1 text-xs font-semibold">
                           <Star className="h-3.5 w-3.5 fill-amber-300 text-amber-300" />
-                          <span>{provider.rating}</span>
+                          <span>{currentProvider.rating}</span>
                         </div>
-                        <p className="text-[11px] text-white/70 mt-0.5">{provider.distance}</p>
+                        <p className="text-[11px] text-white/70 mt-0.5">{currentProvider.distance}</p>
                       </div>
                     </div>
-                  ))}
-                </div>
+                  </motion.div>
 
-                <p className="mt-6 text-center text-xs font-medium text-white/80">
-                  Trusted by thousands of customers daily
-                </p>
+                  {/* Provider Navigation Dots */}
+                  <div className="flex justify-center gap-1.5 mt-4">
+                    {sampleProviders.map((_, idx) => (
+                      <button
+                        key={idx}
+                        onClick={() => setCurrentProviderIndex(idx)}
+                        className={`h-1.5 rounded-full transition-all duration-300 ${
+                          idx === currentProviderIndex 
+                            ? 'w-6 bg-white' 
+                            : 'w-1.5 bg-white/40 hover:bg-white/60'
+                        }`}
+                        aria-label={`View provider ${idx + 1}`}
+                      />
+                    ))}
+                  </div>
+
+                  <p className="mt-6 text-center text-xs font-medium text-white/80">
+                    Trusted by thousands of customers daily
+                  </p>
+                </div>
               </div>
             </div>
 
-            {/* Animated Floating Status Badge */}
+            {/* Floating Status Badges */}
             <motion.div
               animate={{ y: [-6, 6, -6] }}
               transition={{ duration: 4, repeat: Infinity, ease: 'easeInOut' }}
               className="absolute -top-4 -right-2 md:-right-4 rounded-xl bg-card border border-border p-3 shadow-xl backdrop-blur-md hidden sm:block"
             >
               <div className="flex items-center gap-2.5">
-                <CheckCircle2 className="h-5 w-5 text-emerald-500" />
+                <div className="p-1.5 rounded-lg bg-emerald-100 dark:bg-emerald-900/30">
+                  <Shield className="h-4 w-4 text-emerald-600 dark:text-emerald-400" />
+                </div>
                 <div>
                   <p className="text-xs font-bold text-foreground leading-none">100% Verified</p>
-                  <p className="text-[10px] text-muted-foreground mt-0.5">NIN & Identity Checked</p>
+                  <p className="text-[10px] text-muted-foreground mt-0.5">Identity & NIN Checked</p>
+                </div>
+              </div>
+            </motion.div>
+
+            <motion.div
+              animate={{ y: [6, -6, 6] }}
+              transition={{ duration: 5, repeat: Infinity, ease: 'easeInOut', delay: 1 }}
+              className="absolute -bottom-4 -left-2 md:-left-4 rounded-xl bg-card border border-border p-3 shadow-xl backdrop-blur-md hidden sm:block"
+            >
+              <div className="flex items-center gap-2.5">
+                <div className="p-1.5 rounded-lg bg-blue-100 dark:bg-blue-900/30">
+                  <Zap className="h-4 w-4 text-blue-600 dark:text-blue-400" />
+                </div>
+                <div>
+                  <p className="text-xs font-bold text-foreground leading-none">Quick Response</p>
+                  <p className="text-[10px] text-muted-foreground mt-0.5">Average 8 min response</p>
                 </div>
               </div>
             </motion.div>
           </motion.div>
-
         </div>
       </div>
     </section>

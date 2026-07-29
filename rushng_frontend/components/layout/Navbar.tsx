@@ -1,6 +1,6 @@
 'use client';
 
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import Link from 'next/link';
 import Image from 'next/image';
 import { usePathname, useRouter } from 'next/navigation';
@@ -18,6 +18,8 @@ import {
   Package,
   PlusCircle,
   Truck,
+  Bell,
+  Download,
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import {
@@ -29,6 +31,7 @@ import {
   DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu';
 import { Avatar, AvatarFallback } from '@/components/ui/avatar';
+import { Badge } from '@/components/ui/badge';
 import { useAuth } from '@/hooks/useAuth';
 import { useAppStore } from '@/store/app-store';
 
@@ -39,6 +42,17 @@ export function Navbar() {
   const { setView } = useAppStore();
   const [isOpen, setIsOpen] = useState(false);
   const [logoError, setLogoError] = useState(false);
+  const [isScrolled, setIsScrolled] = useState(false);
+  const [notificationCount, setNotificationCount] = useState(3);
+
+  // Handle scroll effect
+  useEffect(() => {
+    const handleScroll = () => {
+      setIsScrolled(window.scrollY > 10);
+    };
+    window.addEventListener('scroll', handleScroll);
+    return () => window.removeEventListener('scroll', handleScroll);
+  }, []);
 
   const navItems = [
     { href: '/', label: 'Home', icon: Home },
@@ -59,19 +73,26 @@ export function Navbar() {
   };
 
   return (
-    <nav className="sticky top-0 z-50 border-b border-slate-200/80 bg-white/85 backdrop-blur-md shadow-xs">
+    <nav 
+      className={cn(
+        "sticky top-0 z-50 transition-all duration-300",
+        isScrolled 
+          ? "bg-background/95 backdrop-blur-xl border-b border-border/50 shadow-sm" 
+          : "bg-background/80 backdrop-blur-md border-b border-border/30"
+      )}
+    >
       <div className="container mx-auto px-4">
-        <div className="flex h-16 items-center justify-between">
+        <div className="flex h-16 items-center justify-between gap-2">
           {/* Brand Logo */}
           <button
             onClick={handleLogoClick}
-            className="flex items-center gap-2.5 transition-opacity hover:opacity-85 group"
+            className="flex items-center gap-2.5 transition-all hover:scale-[1.02] active:scale-[0.98] group"
             aria-label="Go to home page"
           >
-            <div className="relative h-9 w-9 rounded-xl bg-gradient-to-r from-orange-500 to-amber-600 p-1.5 shadow-sm transition-transform group-hover:scale-105 shrink-0 flex items-center justify-center">
+            <div className="relative h-9 w-9 rounded-xl bg-gradient-to-r from-orange-500 to-amber-600 p-1.5 shadow-sm shadow-orange-500/20 transition-transform group-hover:scale-105 shrink-0 flex items-center justify-center">
               {!logoError ? (
                 <Image
-                  src="/rushng-logo.png"
+                  src="/rushng-logo.svg"
                   alt="RUSHNG Logo"
                   width={24}
                   height={24}
@@ -85,7 +106,7 @@ export function Navbar() {
             </div>
             <span className="text-2xl font-black tracking-tight">
               <span className="text-orange-500">RUSH</span>
-              <span className="text-slate-800">NG</span>
+              <span className="text-foreground">NG</span>
             </span>
           </button>
 
@@ -98,13 +119,19 @@ export function Navbar() {
                 <Link
                   key={item.href}
                   href={item.href}
-                  className={`flex items-center gap-1.5 text-sm font-medium transition-colors hover:text-orange-500 ${
-                    isActive ? 'text-orange-600 font-semibold' : 'text-slate-600'
-                  }`}
+                  className={cn(
+                    "flex items-center gap-1.5 text-sm font-medium transition-all duration-200 hover:text-orange-500 relative",
+                    isActive 
+                      ? "text-orange-600 font-semibold" 
+                      : "text-muted-foreground hover:text-foreground"
+                  )}
                   aria-current={isActive ? 'page' : undefined}
                 >
                   <Icon className="h-4 w-4" />
                   {item.label}
+                  {isActive && (
+                    <span className="absolute -bottom-[18px] left-0 right-0 h-0.5 bg-gradient-to-r from-orange-500 to-amber-600 rounded-full" />
+                  )}
                 </Link>
               );
             })}
@@ -124,18 +151,28 @@ export function Navbar() {
             {/* Desktop Auth Section */}
             {isAuthenticated ? (
               <div className="flex items-center gap-2">
+                {/* Notifications */}
+                <Button variant="ghost" size="icon-sm" className="relative">
+                  <Bell className="h-5 w-5" />
+                  {notificationCount > 0 && (
+                    <Badge variant="destructive" size="sm" className="absolute -top-1 -right-1 h-5 w-5 flex items-center justify-center p-0 text-[10px]">
+                      {notificationCount}
+                    </Badge>
+                  )}
+                </Button>
+
                 <Link href="/jobs/my">
-                  <Button variant="ghost" size="sm" className="gap-1.5 text-slate-700 hover:text-orange-600 hover:bg-orange-50/50">
+                  <Button variant="ghost" size="sm" className="gap-1.5 text-muted-foreground hover:text-orange-500 hover:bg-orange-50/50">
                     <ClipboardList className="h-4 w-4 text-orange-500" />
-                    My Deliveries & Jobs
+                    My Jobs
                   </Button>
                 </Link>
 
                 {user?.role === 'provider' && (
                   <Link href="/providers/me">
-                    <Button variant="ghost" size="sm" className="gap-1.5 text-slate-700 hover:text-orange-600 hover:bg-orange-50/50">
+                    <Button variant="ghost" size="sm" className="gap-1.5 text-muted-foreground hover:text-orange-500 hover:bg-orange-50/50">
                       <Truck className="h-4 w-4 text-orange-500" />
-                      Rider & Artisan Portal
+                      Portal
                     </Button>
                   </Link>
                 )}
@@ -143,41 +180,41 @@ export function Navbar() {
                 {/* Profile Dropdown */}
                 <DropdownMenu>
                   <DropdownMenuTrigger asChild>
-                    <Button variant="ghost" className="relative h-9 w-9 rounded-full p-0 hover:ring-2 hover:ring-orange-400 focus-visible:ring-2 focus-visible:ring-orange-500 transition-all">
-                      <Avatar className="h-9 w-9 border border-orange-200">
+                    <Button variant="ghost" className="relative h-9 w-9 rounded-full p-0 hover:ring-2 hover:ring-orange-400 transition-all">
+                      <Avatar className="h-9 w-9 border-2 border-orange-200">
                         <AvatarFallback className="bg-gradient-to-br from-orange-500 to-amber-600 text-white text-xs font-bold">
                           {user?.full_name ? user.full_name.charAt(0).toUpperCase() : 'U'}
                         </AvatarFallback>
                       </Avatar>
                     </Button>
                   </DropdownMenuTrigger>
-                  <DropdownMenuContent align="end" className="w-56 p-1.5 shadow-lg border-slate-200">
+                  <DropdownMenuContent align="end" className="w-56 p-1.5 shadow-lg border-border/50 glass">
                     <DropdownMenuLabel className="p-2">
                       <div className="flex flex-col space-y-0.5">
-                        <p className="text-sm font-semibold text-slate-900 truncate">{user?.full_name}</p>
-                        <p className="text-xs text-slate-500 truncate">{user?.email}</p>
-                        <span className="inline-block mt-1 text-[10px] uppercase font-bold tracking-wider px-1.5 py-0.5 bg-orange-100 text-orange-700 rounded w-fit">
+                        <p className="text-sm font-semibold text-foreground truncate">{user?.full_name}</p>
+                        <p className="text-xs text-muted-foreground truncate">{user?.email}</p>
+                        <Badge variant="orange" size="sm" className="mt-1 w-fit">
                           {user?.role || 'User'}
-                        </span>
+                        </Badge>
                       </div>
                     </DropdownMenuLabel>
                     <DropdownMenuSeparator />
                     <DropdownMenuItem asChild>
-                      <Link href="/profile" className="cursor-pointer flex items-center gap-2 rounded-md px-2 py-1.5 text-sm text-slate-700 hover:bg-slate-100">
-                        <User className="h-4 w-4 text-slate-500" />
+                      <Link href="/profile" className="cursor-pointer flex items-center gap-2 rounded-md px-2 py-1.5 text-sm text-foreground hover:bg-muted">
+                        <User className="h-4 w-4 text-muted-foreground" />
                         <span>Profile Settings</span>
                       </Link>
                     </DropdownMenuItem>
                     <DropdownMenuItem asChild>
-                      <Link href="/jobs/my" className="cursor-pointer flex items-center gap-2 rounded-md px-2 py-1.5 text-sm text-slate-700 hover:bg-slate-100">
-                        <ClipboardList className="h-4 w-4 text-slate-500" />
+                      <Link href="/jobs/my" className="cursor-pointer flex items-center gap-2 rounded-md px-2 py-1.5 text-sm text-foreground hover:bg-muted">
+                        <ClipboardList className="h-4 w-4 text-muted-foreground" />
                         <span>My Requests</span>
                       </Link>
                     </DropdownMenuItem>
                     <DropdownMenuItem asChild>
-                      <Link href="/settings" className="cursor-pointer flex items-center gap-2 rounded-md px-2 py-1.5 text-sm text-slate-700 hover:bg-slate-100">
-                        <Settings className="h-4 w-4 text-slate-500" />
-                        <span>Account Preferences</span>
+                      <Link href="/settings" className="cursor-pointer flex items-center gap-2 rounded-md px-2 py-1.5 text-sm text-foreground hover:bg-muted">
+                        <Settings className="h-4 w-4 text-muted-foreground" />
+                        <span>Preferences</span>
                       </Link>
                     </DropdownMenuItem>
                     <DropdownMenuSeparator />
@@ -194,12 +231,12 @@ export function Navbar() {
             ) : (
               <div className="flex items-center gap-2.5">
                 <Link href="/login">
-                  <Button variant="ghost" size="sm" className="text-slate-700 hover:text-orange-600 hover:bg-orange-50">
+                  <Button variant="ghost" size="sm" className="text-muted-foreground hover:text-orange-500 hover:bg-orange-50">
                     Log In
                   </Button>
                 </Link>
                 <Link href="/register">
-                  <Button size="sm" className="bg-gradient-to-r from-orange-500 to-amber-600 text-white font-medium hover:from-orange-600 hover:to-amber-700 shadow-sm transition-all duration-200">
+                  <Button size="sm" variant="gradient">
                     Get Started
                   </Button>
                 </Link>
@@ -207,19 +244,32 @@ export function Navbar() {
             )}
           </div>
 
-          {/* Mobile Menu Toggle */}
-          <button
-            className="md:hidden rounded-lg p-2 text-slate-700 hover:bg-slate-100 transition-colors"
-            onClick={() => setIsOpen(!isOpen)}
-            aria-label={isOpen ? 'Close menu' : 'Open menu'}
-          >
-            {isOpen ? <X className="h-6 w-6" /> : <Menu className="h-6 w-6" />}
-          </button>
+          {/* Mobile Actions */}
+          <div className="flex items-center gap-2 md:hidden">
+            {isAuthenticated && (
+              <Button variant="ghost" size="icon-sm" className="relative">
+                <Bell className="h-5 w-5" />
+                {notificationCount > 0 && (
+                  <Badge variant="destructive" size="sm" className="absolute -top-1 -right-1 h-5 w-5 flex items-center justify-center p-0 text-[10px]">
+                    {notificationCount}
+                  </Badge>
+                )}
+              </Button>
+            )}
+            
+            <button
+              className="rounded-lg p-2 text-muted-foreground hover:bg-muted transition-colors"
+              onClick={() => setIsOpen(!isOpen)}
+              aria-label={isOpen ? 'Close menu' : 'Open menu'}
+            >
+              {isOpen ? <X className="h-6 w-6" /> : <Menu className="h-6 w-6" />}
+            </button>
+          </div>
         </div>
 
         {/* Mobile Navigation Drawer */}
         {isOpen && (
-          <div className="md:hidden py-4 border-t border-slate-100 space-y-3">
+          <div className="md:hidden py-4 border-t border-border/50 space-y-3 animate-slide-down">
             <div className="flex flex-col space-y-1">
               {navItems.map((item) => {
                 const Icon = item.icon;
@@ -228,9 +278,12 @@ export function Navbar() {
                   <Link
                     key={item.href}
                     href={item.href}
-                    className={`flex items-center gap-3 px-3 py-2.5 text-sm font-medium rounded-lg transition-colors ${
-                      isActive ? 'text-orange-600 bg-orange-50' : 'text-slate-700 hover:bg-slate-50'
-                    }`}
+                    className={cn(
+                      "flex items-center gap-3 px-3 py-2.5 text-sm font-medium rounded-lg transition-all",
+                      isActive 
+                        ? "text-orange-600 bg-orange-50" 
+                        : "text-muted-foreground hover:bg-muted hover:text-foreground"
+                    )}
                     onClick={() => setIsOpen(false)}
                   >
                     <Icon className="h-4 w-4" />
@@ -240,24 +293,24 @@ export function Navbar() {
               })}
             </div>
 
-            <div className="pt-2 border-t border-slate-100">
+            <div className="pt-2 border-t border-border/50">
               {isAuthenticated ? (
                 <div className="space-y-1">
-                  <div className="px-3 py-2 mb-2 rounded-lg bg-slate-50 flex items-center gap-3">
-                    <Avatar className="h-8 w-8 border border-orange-200">
+                  <div className="px-3 py-2 mb-2 rounded-lg bg-muted/50 flex items-center gap-3">
+                    <Avatar className="h-8 w-8 border-2 border-orange-200">
                       <AvatarFallback className="bg-orange-500 text-white text-xs font-bold">
                         {user?.full_name ? user.full_name.charAt(0).toUpperCase() : 'U'}
                       </AvatarFallback>
                     </Avatar>
                     <div className="overflow-hidden">
-                      <p className="text-xs font-semibold text-slate-800 truncate">{user?.full_name}</p>
-                      <p className="text-[10px] text-slate-500 truncate">{user?.email}</p>
+                      <p className="text-xs font-semibold text-foreground truncate">{user?.full_name}</p>
+                      <p className="text-[10px] text-muted-foreground truncate">{user?.email}</p>
                     </div>
                   </div>
 
                   <Link
                     href="/jobs/new"
-                    className="flex items-center gap-3 px-3 py-2.5 text-sm font-medium rounded-lg text-orange-600 hover:bg-orange-50"
+                    className="flex items-center gap-3 px-3 py-2.5 text-sm font-medium rounded-lg text-orange-600 bg-orange-50 hover:bg-orange-100"
                     onClick={() => setIsOpen(false)}
                   >
                     <PlusCircle className="h-4 w-4" />
@@ -266,7 +319,7 @@ export function Navbar() {
 
                   <Link
                     href="/jobs/my"
-                    className="flex items-center gap-3 px-3 py-2.5 text-sm font-medium rounded-lg text-slate-700 hover:bg-slate-50"
+                    className="flex items-center gap-3 px-3 py-2.5 text-sm font-medium rounded-lg text-muted-foreground hover:bg-muted hover:text-foreground"
                     onClick={() => setIsOpen(false)}
                   >
                     <ClipboardList className="h-4 w-4" />
@@ -276,7 +329,7 @@ export function Navbar() {
                   {user?.role === 'provider' && (
                     <Link
                       href="/providers/me"
-                      className="flex items-center gap-3 px-3 py-2.5 text-sm font-medium rounded-lg text-slate-700 hover:bg-slate-50"
+                      className="flex items-center gap-3 px-3 py-2.5 text-sm font-medium rounded-lg text-muted-foreground hover:bg-muted hover:text-foreground"
                       onClick={() => setIsOpen(false)}
                     >
                       <Briefcase className="h-4 w-4" />
@@ -286,7 +339,7 @@ export function Navbar() {
 
                   <Link
                     href="/profile"
-                    className="flex items-center gap-3 px-3 py-2.5 text-sm font-medium rounded-lg text-slate-700 hover:bg-slate-50"
+                    className="flex items-center gap-3 px-3 py-2.5 text-sm font-medium rounded-lg text-muted-foreground hover:bg-muted hover:text-foreground"
                     onClick={() => setIsOpen(false)}
                   >
                     <User className="h-4 w-4" />
@@ -305,14 +358,14 @@ export function Navbar() {
                 <div className="flex flex-col gap-2 pt-1">
                   <Link
                     href="/login"
-                    className="flex items-center justify-center gap-2 px-3 py-2.5 text-sm font-medium rounded-lg text-slate-700 hover:bg-slate-100 border border-slate-200"
+                    className="flex items-center justify-center gap-2 px-3 py-2.5 text-sm font-medium rounded-lg text-foreground hover:bg-muted border border-border/50"
                     onClick={() => setIsOpen(false)}
                   >
                     Log In
                   </Link>
                   <Link
                     href="/register"
-                    className="flex items-center justify-center gap-2 px-3 py-2.5 text-sm font-semibold rounded-lg bg-gradient-to-r from-orange-500 to-amber-600 text-white shadow-xs"
+                    className="flex items-center justify-center gap-2 px-3 py-2.5 text-sm font-semibold rounded-lg bg-gradient-to-r from-orange-500 to-amber-600 text-white shadow-sm"
                     onClick={() => setIsOpen(false)}
                   >
                     Get Started
@@ -326,3 +379,6 @@ export function Navbar() {
     </nav>
   );
 }
+
+// Add cn utility import if not already present
+import { cn } from '@/lib/utils';

@@ -190,3 +190,32 @@ rushng-frontend/
 ├── 📄 components.json                # shadcn/ui config
 ├── 📄 next-env.d.ts												...
 └── 📄 README.md													...
+
+
+
+
+Priority 1 (Foundation):
+
+    app/globals.css - To understand your current design tokens
+
+    app/layout.tsx - Root layout structure
+
+    tailwind.config.js - Your current theme configuration
+
+Priority 2 (Components):
+
+    components/ui/button.tsx
+
+    components/ui/card.tsx
+
+    components/layout/Navbar.tsx
+
+    components/layout/Sidebar.tsx
+
+Priority 3 (Pages):
+
+    app/page.tsx (homepage)
+
+    app/jobs/page.tsx
+
+    app/dashboard/page.tsx

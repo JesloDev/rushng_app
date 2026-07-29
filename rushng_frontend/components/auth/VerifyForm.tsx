@@ -6,8 +6,9 @@ import { authApi } from '@/lib/api';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
-import { Loader2, AlertCircle, Mail, Shield, CheckCircle2, RefreshCw } from 'lucide-react';
+import { Loader2, AlertCircle, Mail, Shield, CheckCircle2, RefreshCw, Sparkles } from 'lucide-react';
 import { toast } from 'sonner';
+import { motion } from 'framer-motion';
 
 export function VerifyForm() {
   const router = useRouter();
@@ -19,10 +20,10 @@ export function VerifyForm() {
   const [timer, setTimer] = useState(60);
   const [canResend, setCanResend] = useState(false);
   const [isSuccess, setIsSuccess] = useState(false);
+  const [focusedField, setFocusedField] = useState<string | null>(null);
 
   const timerRef = useRef<NodeJS.Timeout | null>(null);
 
-  // Helper to manage countdown interval safely
   const startTimer = useCallback(() => {
     if (timerRef.current) clearInterval(timerRef.current);
     setTimer(60);
@@ -59,7 +60,7 @@ export function VerifyForm() {
       const response = await authApi.verify({ email: verificationEmail, code: verificationCode });
       if (response.data.success) {
         setIsSuccess(true);
-        toast.success('Account verified successfully!');
+        toast.success('Account verified successfully! 🎉');
         setTimeout(() => {
           router.push('/login');
         }, 2000);
@@ -115,54 +116,78 @@ export function VerifyForm() {
 
   if (isSuccess) {
     return (
-      <div className="text-center py-8 space-y-3">
+      <motion.div
+        initial={{ opacity: 0, scale: 0.95 }}
+        animate={{ opacity: 1, scale: 1 }}
+        className="text-center py-8 space-y-4"
+      >
         <div className="flex justify-center">
-          <div className="rounded-full bg-emerald-100 dark:bg-emerald-950/50 p-3">
-            <CheckCircle2 className="h-10 w-10 text-emerald-600 dark:text-emerald-400 animate-bounce" />
-          </div>
+          <motion.div
+            initial={{ scale: 0 }}
+            animate={{ scale: 1 }}
+            transition={{ delay: 0.2, type: 'spring' }}
+            className="rounded-full bg-emerald-100 dark:bg-emerald-950/50 p-4"
+          >
+            <CheckCircle2 className="h-12 w-12 text-emerald-600 dark:text-emerald-400" />
+          </motion.div>
         </div>
-        <h3 className="text-xl font-bold tracking-tight">Account Verified! 🎉</h3>
-        <p className="text-sm text-muted-foreground">Redirecting you to login page...</p>
-      </div>
+        <h3 className="text-2xl font-bold tracking-tight">Account Verified! 🎉</h3>
+        <p className="text-sm text-muted-foreground">
+          Your account has been successfully verified.
+          <br />
+          Redirecting you to login page...
+        </p>
+        <div className="flex justify-center gap-1">
+          <div className="h-1.5 w-1.5 rounded-full bg-primary animate-bounce" style={{ animationDelay: '0ms' }} />
+          <div className="h-1.5 w-1.5 rounded-full bg-primary animate-bounce" style={{ animationDelay: '150ms' }} />
+          <div className="h-1.5 w-1.5 rounded-full bg-primary animate-bounce" style={{ animationDelay: '300ms' }} />
+        </div>
+      </motion.div>
     );
   }
 
   return (
-    <form onSubmit={handleSubmit} className="space-y-5 text-left" noValidate>
+    <form onSubmit={handleSubmit} className="space-y-6" noValidate>
       {error && (
-        <div className="flex items-center gap-2 rounded-lg border border-destructive/30 bg-destructive/10 p-3 text-sm text-destructive">
+        <motion.div
+          initial={{ opacity: 0, y: -10 }}
+          animate={{ opacity: 1, y: 0 }}
+          className="flex items-center gap-2.5 rounded-lg border border-destructive/20 bg-destructive/10 p-3.5 text-sm text-destructive"
+        >
           <AlertCircle className="h-4 w-4 shrink-0" />
           <span>{error}</span>
-        </div>
+        </motion.div>
       )}
 
       {/* Email Input */}
       <div className="space-y-2">
-        <Label htmlFor="email" className="block text-sm font-semibold">
+        <Label htmlFor="email" className="text-sm font-semibold">
           Email Address
         </Label>
-        <div className="relative">
-          <Mail className="absolute left-3.5 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+        <div className="relative group">
+          <Mail className="absolute left-3.5 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground group-focus-within:text-primary transition-colors" />
           <Input
             id="email"
             type="email"
             placeholder="Enter the email you used to sign up"
             value={email}
             onChange={(e) => setEmail(e.target.value)}
+            onFocus={() => setFocusedField('email')}
+            onBlur={() => setFocusedField(null)}
             required
             disabled={loading}
-            className="h-12 pl-10 transition-all focus-visible:ring-primary"
+            className="h-12 pl-10 transition-all focus-visible:ring-primary focus-visible:ring-2"
           />
         </div>
       </div>
 
       {/* Verification Code Input */}
       <div className="space-y-2">
-        <Label htmlFor="code" className="block text-sm font-semibold">
+        <Label htmlFor="code" className="text-sm font-semibold">
           Verification Code
         </Label>
-        <div className="relative">
-          <Shield className="absolute left-3.5 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+        <div className="relative group">
+          <Shield className="absolute left-3.5 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground group-focus-within:text-primary transition-colors" />
           <Input
             id="code"
             type="text"
@@ -172,30 +197,36 @@ export function VerifyForm() {
             maxLength={6}
             value={code}
             onChange={handleCodeChange}
+            onFocus={() => setFocusedField('code')}
+            onBlur={() => setFocusedField(null)}
             required
             disabled={loading}
             aria-invalid={!!error}
-            className="h-12 pl-10 text-center text-xl tracking-[0.5em] font-mono font-bold transition-all focus-visible:ring-primary"
+            className="h-12 pl-10 text-center text-2xl tracking-[0.5em] font-mono font-bold transition-all focus-visible:ring-primary focus-visible:ring-2"
           />
         </div>
-        <p className="text-xs text-muted-foreground">
-          Enter the 6-digit security code sent to your inbox.
+        <p className="text-xs text-muted-foreground flex items-center gap-1">
+          <Sparkles className="h-3 w-3 text-primary" />
+          Enter the 6-digit security code sent to your inbox
         </p>
       </div>
 
       {/* Verify Button */}
       <Button
         type="submit"
-        className="w-full h-12 gradient-rush text-white font-semibold text-sm shadow-rush hover:opacity-95 active:scale-[0.98] transition-all flex items-center justify-center gap-2"
+        className="w-full h-12 gradient-rush text-white font-semibold shadow-brand hover:shadow-brand-lg hover:scale-[1.02] active:scale-[0.98] transition-all duration-200 text-base"
         disabled={loading || code.length < 6}
       >
         {loading ? (
           <>
-            <Loader2 className="h-5 w-5 animate-spin" />
-            Verifying Code...
+            <Loader2 className="mr-2 h-5 w-5 animate-spin" />
+            Verifying...
           </>
         ) : (
-          'Verify Account'
+          <>
+            <Shield className="mr-2 h-4 w-4" />
+            Verify Account
+          </>
         )}
       </Button>
 
@@ -207,20 +238,23 @@ export function VerifyForm() {
             type="button"
             onClick={handleResend}
             disabled={!canResend || resending}
-            className="text-primary hover:underline disabled:text-muted-foreground disabled:no-underline disabled:cursor-not-allowed font-semibold inline-flex items-center gap-1 transition-colors"
+            className="text-primary hover:underline disabled:text-muted-foreground disabled:no-underline disabled:cursor-not-allowed font-semibold inline-flex items-center gap-1.5 transition-colors"
           >
             {resending ? (
               <>
-                <Loader2 className="h-3.5 w-3.5 animate-spin inline" />
+                <Loader2 className="h-3.5 w-3.5 animate-spin" />
                 Resending...
               </>
             ) : canResend ? (
               <>
-                <RefreshCw className="h-3.5 w-3.5 inline" />
+                <RefreshCw className="h-3.5 w-3.5" />
                 Resend code
               </>
             ) : (
-              `Resend in ${timer}s`
+              <>
+                <RefreshCw className="h-3.5 w-3.5 animate-spin" />
+                Resend in {timer}s
+              </>
             )}
           </button>
         </p>

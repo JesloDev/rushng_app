@@ -1,26 +1,30 @@
 /** @type {import('next').NextConfig} */
-const rawApiUrl = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000';
-const cleanBackendHost = rawApiUrl.replace(/\/api\/?$/, '');
+const withPWA = require('next-pwa')({
+  dest: 'public',
+  register: true,
+  skipWaiting: true,
+  disable: process.env.NODE_ENV === 'development',
+  runtimeCaching: [
+    {
+      urlPattern: /^https?.*/,
+      handler: 'NetworkFirst',
+      options: {
+        cacheName: 'rushng-cache',
+        expiration: {
+          maxEntries: 200,
+          maxAgeSeconds: 30 * 24 * 60 * 60,
+        },
+      },
+    },
+  ],
+});
 
 const nextConfig = {
-  // Remote patterns for image optimization
   images: {
     remotePatterns: [
       {
         protocol: 'https',
-        hostname: 'localhost',
-        port: '',
-        pathname: '/**',
-      },
-      {
-        protocol: 'http',
-        hostname: 'localhost',
-        port: '3000',
-        pathname: '/**',
-      },
-      {
-        protocol: 'https',
-        hostname: 'api.rushng.com',
+        hostname: 'rushng.s3.amazonaws.com',
         port: '',
         pathname: '/**',
       },
@@ -30,54 +34,46 @@ const nextConfig = {
         port: '',
         pathname: '/**',
       },
-      {
-        protocol: 'https',
-        hostname: 'images.unsplash.com',
-        port: '',
-        pathname: '/**',
-      },
     ],
+    formats: ['image/avif', 'image/webp'],
   },
-
-  // Package optimization
+  reactStrictMode: true,
+  poweredByHeader: false,
+  compress: true,
+  swcMinify: true,
   experimental: {
-    optimizePackageImports: ['lucide-react', 'date-fns', 'framer-motion'],
+    optimizeCss: true,
   },
-
-  // API rewrites (proxy to FastAPI backend without duplicating /api prefix)
-  async rewrites() {
+  async headers() {
     return [
       {
-        source: '/api/:path*',
-        destination: `${cleanBackendHost}/api/:path*`,
+        source: '/sw.js',
+        headers: [
+          {
+            key: 'Content-Type',
+            value: 'application/javascript; charset=utf-8',
+          },
+          {
+            key: 'Cache-Control',
+            value: 'no-cache, no-store, must-revalidate',
+          },
+        ],
+      },
+      {
+        source: '/manifest.json',
+        headers: [
+          {
+            key: 'Content-Type',
+            value: 'application/json; charset=utf-8',
+          },
+          {
+            key: 'Cache-Control',
+            value: 'public, max-age=31536000, immutable',
+          },
+        ],
       },
     ];
   },
-
-  // Webpack fallbacks for client-side builds
-  webpack: (config, { isServer }) => {
-    if (!isServer) {
-      config.resolve.fallback = {
-        ...config.resolve.fallback,
-        fs: false,
-        net: false,
-        tls: false,
-        crypto: false,
-      };
-    }
-    return config;
-  },
-
-  // Compiler settings
-  compiler: {
-    removeConsole: process.env.NODE_ENV === 'production',
-  },
-
-  poweredByHeader: false,
-  reactStrictMode: true,
-  compress: true,
-  productionBrowserSourceMaps: false,
-  swcMinify: true,
 };
 
-module.exports = nextConfig;
+module.exports = withPWA(nextConfig);

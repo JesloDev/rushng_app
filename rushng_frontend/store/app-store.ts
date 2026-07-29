@@ -117,11 +117,48 @@ export const useAppStore = create<AppState>()(
           previousView: null,
         })),
 
-      // User & Auth
+      // User & Auth - Fixed to sync properly
       user: null,
       isAuthenticated: false,
-      setUser: (user) => set({ user, isAuthenticated: !!user }),
-      setAuth: (isAuthenticated) => set({ isAuthenticated }),
+      setUser: (user) => {
+        // Normalize role when setting user
+        if (user && user.role) {
+          user.role = user.role.toLowerCase() as any;
+        }
+        set({ 
+          user, 
+          isAuthenticated: !!user 
+        });
+      },
+      setAuth: (isAuthenticated) => {
+        // When setting auth to false, also clear user
+        if (!isAuthenticated) {
+          set({ user: null, isAuthenticated: false });
+        } else {
+          // If setting auth to true, ensure we have a user
+          const state = get();
+          if (!state.user) {
+            // Try to get user from localStorage
+            try {
+              const stored = localStorage.getItem('rushng-app-storage');
+              if (stored) {
+                const parsed = JSON.parse(stored);
+                if (parsed.state?.user) {
+                  const user = parsed.state.user;
+                  if (user.role) {
+                    user.role = user.role.toLowerCase();
+                  }
+                  set({ user, isAuthenticated: true });
+                  return;
+                }
+              }
+            } catch (e) {
+              console.error('Error restoring user from storage:', e);
+            }
+          }
+          set({ isAuthenticated });
+        }
+      },
 
       // UI
       isLoading: false,
@@ -169,6 +206,7 @@ export const useAppStore = create<AppState>()(
         if (typeof window !== 'undefined') {
           localStorage.removeItem('token');
           localStorage.removeItem('refresh_token');
+          localStorage.removeItem('access_token');
         }
         set({
           user: null,
@@ -187,6 +225,10 @@ export const useAppStore = create<AppState>()(
         currentView: state.currentView,
       }),
       onRehydrateStorage: () => (state) => {
+        // Normalize role on rehydration
+        if (state?.user?.role) {
+          state.user.role = state.user.role.toLowerCase() as any;
+        }
         state?.setHasHydrated(true);
       },
     }

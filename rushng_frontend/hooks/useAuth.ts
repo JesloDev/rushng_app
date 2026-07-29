@@ -14,7 +14,13 @@ export interface AuthError {
 
 export function useAuth() {
   const router = useRouter();
-  const { setUser, setAuth, logout: storeLogout, user, isAuthenticated } = useAppStore();
+  const { 
+    user, 
+    isAuthenticated, 
+    setUser, 
+    setAuth, 
+    logout: storeLogout 
+  } = useAppStore();
 
   const [loading, setLoading] = useState(true);
   const [loginLoading, setLoginLoading] = useState(false);
@@ -28,29 +34,41 @@ export function useAuth() {
     const initAuth = async () => {
       if (typeof window === 'undefined') return;
 
-      const token = localStorage.getItem('access_token');
+      // Check if we already have a user in the store
+      if (user && isAuthenticated) {
+        setLoading(false);
+        return;
+      }
+
+      const token = localStorage.getItem('access_token') || localStorage.getItem('token');
       if (token) {
         try {
           const response = await authApi.me();
           if (response.data?.success && isMounted) {
             const userData = response.data.data?.user || response.data.data;
+            // Normalize role to lowercase
+            if (userData && userData.role) {
+              userData.role = userData.role.toLowerCase();
+            }
             setUser(userData);
             setAuth(true);
+            console.log('User initialized from API:', userData);
           } else if (isMounted) {
             localStorage.removeItem('access_token');
+            localStorage.removeItem('token');
             localStorage.removeItem('refresh_token');
             setAuth(false);
-            setUser(null);
           }
-        } catch {
+        } catch (error) {
+          console.error('Auth initialization error:', error);
           if (isMounted) {
             localStorage.removeItem('access_token');
+            localStorage.removeItem('token');
             localStorage.removeItem('refresh_token');
             setAuth(false);
-            setUser(null);
           }
         }
-      } else if (isMounted) {
+      } else {
         setAuth(false);
       }
 
@@ -64,43 +82,26 @@ export function useAuth() {
     return () => {
       isMounted = false;
     };
-  }, [setUser, setAuth]);
+  }, [user, isAuthenticated, setUser, setAuth]);
 
   const clearError = useCallback(() => setError(null), []);
 
   const login = useCallback(
-    async (email: string, password: string): Promise<boolean> => {
+    async (email: string, password: string, remember?: boolean): Promise<any> => {
       setLoginLoading(true);
       setError(null);
 
       try {
-        if (!email) {
-          const err = { field: 'email', message: 'Email is required' };
-          setError(err);
-          toast.error('Please enter your email');
-          return false;
-        }
-        if (!password) {
-          const err = { field: 'password', message: 'Password is required' };
-          setError(err);
-          toast.error('Please enter your password');
-          return false;
-        }
-        if (password.length < 8) {
-          const err = {
-            field: 'password',
-            message: 'Password must be at least 8 characters',
-          };
-          setError(err);
-          toast.error('Password must be at least 8 characters');
-          return false;
-        }
-
         const response = await authApi.login({ email, password });
 
         if (response.data?.success) {
           const resData = response.data.data || {};
           const userData = resData.user || resData;
+
+          // Normalize role to lowercase
+          if (userData && userData.role) {
+            userData.role = userData.role.toLowerCase();
+          }
 
           const accessToken = resData.access_token || response.data.access_token;
           const refreshToken = resData.refresh_token || response.data.refresh_token;
@@ -114,14 +115,15 @@ export function useAuth() {
 
           setUser(userData);
           setAuth(true);
+          console.log('User logged in:', userData);
           toast.success(`Welcome back, ${userData.full_name || 'User'}!`);
-          return true;
+          return { success: true, user: userData };
         } else {
           const errorMsg =
             response.data?.message || 'Login failed. Please check your credentials.';
           setError({ message: errorMsg });
           toast.error('Login failed', { description: errorMsg });
-          return false;
+          return { success: false, error: errorMsg };
         }
       } catch (err: any) {
         const errorMsg =
@@ -130,7 +132,7 @@ export function useAuth() {
           'Connection failed. Please try again.';
         setError({ message: errorMsg });
         toast.error('Connection error', { description: errorMsg });
-        return false;
+        return { success: false, error: errorMsg };
       } finally {
         setLoginLoading(false);
       }
@@ -150,35 +152,6 @@ export function useAuth() {
       setError(null);
 
       try {
-        if (!userData.full_name?.trim()) {
-          setError({ field: 'full_name', message: 'Full name is required' });
-          toast.error('Please enter your full name');
-          return false;
-        }
-        if (!userData.email?.trim()) {
-          setError({ field: 'email', message: 'Email is required' });
-          toast.error('Please enter your email');
-          return false;
-        }
-        if (!userData.phone?.trim()) {
-          setError({ field: 'phone', message: 'Phone number is required' });
-          toast.error('Please enter your phone number');
-          return false;
-        }
-        if (!userData.password) {
-          setError({ field: 'password', message: 'Password is required' });
-          toast.error('Please create a password');
-          return false;
-        }
-        if (userData.password.length < 8) {
-          setError({
-            field: 'password',
-            message: 'Password must be at least 8 characters',
-          });
-          toast.error('Password must be at least 8 characters');
-          return false;
-        }
-
         const response = await authApi.register(userData);
 
         if (response.data?.success) {
@@ -231,15 +204,14 @@ export function useAuth() {
     } finally {
       if (typeof window !== 'undefined') {
         localStorage.removeItem('access_token');
+        localStorage.removeItem('token');
         localStorage.removeItem('refresh_token');
       }
       storeLogout();
-      setUser(null);
-      setAuth(false);
       toast.success('Logged out successfully');
       router.push('/');
     }
-  }, [router, setAuth, setUser, storeLogout]);
+  }, [router, storeLogout]);
 
   const updateProfile = useCallback(
     async (data: Record<string, any>): Promise<boolean> => {
@@ -247,6 +219,9 @@ export function useAuth() {
         const response = await authApi.updateProfile(data);
         if (response.data?.success) {
           const updatedUser = response.data.data?.user || response.data.data;
+          if (updatedUser && updatedUser.role) {
+            updatedUser.role = updatedUser.role.toLowerCase();
+          }
           setUser(updatedUser);
           toast.success('Profile updated successfully!');
           return true;

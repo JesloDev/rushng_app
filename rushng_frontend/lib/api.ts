@@ -1,419 +1,307 @@
-import axios, { AxiosInstance, InternalAxiosRequestConfig, AxiosError } from 'axios';
-import { toast } from 'sonner';
+import axios from 'axios';
+import { ApiResponse } from '@/types';
 
-// ============================================================
-// BASE CONFIG & URL SANITIZATION
-// ============================================================
+// Flask routes are all prefixed with /api
+// Example: /api/auth/login, /api/jobs, /api/providers
+const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:5000/api';
 
-const RAW_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000';
-const BASE_HOST = RAW_URL.replace(/\/api\/?$/, '');
+console.log('🔗 API Base URL:', API_BASE_URL);
 
-const api: AxiosInstance = axios.create({
-  baseURL: `${BASE_HOST}/api`,
+export const api = axios.create({
+  baseURL: API_BASE_URL,
   headers: {
     'Content-Type': 'application/json',
+    'Accept': 'application/json',
   },
+  withCredentials: true,
   timeout: 30000,
 });
 
-// ============================================================
-// REFRESH CONCURRENCY QUEUE
-// ============================================================
-
-let isRefreshing = false;
-let failedQueue: Array<{
-  resolve: (token: string) => void;
-  reject: (error: any) => void;
-}> = [];
-
-const processQueue = (error: any, token: string | null = null) => {
-  failedQueue.forEach((promise) => {
-    if (error) {
-      promise.reject(error);
-    } else if (token) {
-      promise.resolve(token);
-    }
-  });
-  failedQueue = [];
-};
-
-// Helper to safely access localStorage during SSR/SSG
-const getStoredToken = (key: string): string | null => {
-  if (typeof window === 'undefined') return null;
-  return localStorage.getItem(key);
-};
-
-// ============================================================
-// INTERCEPTORS
-// ============================================================
-
-// Request interceptor - Add Bearer token
+// Request interceptor
 api.interceptors.request.use(
-  (config: InternalAxiosRequestConfig) => {
-    const token = getStoredToken('access_token');
-    if (token && config.headers) {
+  (config) => {
+    // Remove trailing slashes to match Flask routes
+    if (config.url) {
+      config.url = config.url.replace(/\/+$/, '');
+    }
+    
+    const token = localStorage.getItem('access_token');
+    if (token) {
       config.headers.Authorization = `Bearer ${token}`;
     }
+    
+    // Log the full URL for debugging
+    console.log('📤 API Request:', config.method?.toUpperCase(), `${API_BASE_URL}${config.url}`);
+    
     return config;
   },
-  (error: AxiosError) => Promise.reject(error)
+  (error) => Promise.reject(error)
 );
 
-// Response interceptor - Token refresh & global error handler
+// Response interceptor
 api.interceptors.response.use(
-  (response) => response,
-  async (error: AxiosError<any>) => {
-    const originalRequest = error.config as InternalAxiosRequestConfig & { _retry?: boolean };
-
-    // Handle 401 Unauthorized - execute token refresh queue
-    if (error.response?.status === 401 && originalRequest && !originalRequest._retry) {
-      if (isRefreshing) {
-        return new Promise((resolve, reject) => {
-          failedQueue.push({ resolve, reject });
-        })
-          .then((token) => {
-            if (originalRequest.headers) {
-              originalRequest.headers.Authorization = `Bearer ${token}`;
-            }
-            return api(originalRequest);
-          })
-          .catch((err) => Promise.reject(err));
-      }
-
+  (response) => {
+    console.log('📥 API Response:', response.status, response.config.url);
+    return response;
+  },
+  async (error) => {
+    const originalRequest = error.config;
+    
+    // Handle network errors
+    if (error.message === 'Network Error' || error.code === 'ERR_NETWORK') {
+      console.error('🌐 Network Error:', error);
+      return Promise.reject({
+        ...error,
+        message: 'Unable to connect to server. Please check your connection.',
+        isNetworkError: true
+      });
+    }
+    
+    // Handle 401 unauthorized - try refresh token
+    if (error.response?.status === 401 && !originalRequest._retry) {
       originalRequest._retry = true;
-      isRefreshing = true;
-
       try {
-        const refreshToken = getStoredToken('refresh_token');
-        if (!refreshToken) {
-          throw new Error('No refresh token available');
+        const refreshToken = localStorage.getItem('refresh_token');
+        if (refreshToken) {
+          const response = await api.post('/auth/refresh', { refresh_token: refreshToken });
+          if (response.data?.access_token) {
+            localStorage.setItem('access_token', response.data.access_token);
+            originalRequest.headers.Authorization = `Bearer ${response.data.access_token}`;
+            return api(originalRequest);
+          }
         }
-
-        const response = await axios.post(`${BASE_HOST}/api/auth/refresh`, {
-          refresh_token: refreshToken,
-        });
-
-        const access_token =
-          response.data?.data?.access_token || response.data?.access_token;
-
-        if (!access_token) {
-          throw new Error('Failed to retrieve new access token');
-        }
-
-        if (typeof window !== 'undefined') {
-          localStorage.setItem('access_token', access_token);
-        }
-
-        processQueue(null, access_token);
-
-        if (originalRequest.headers) {
-          originalRequest.headers.Authorization = `Bearer ${access_token}`;
-        }
-
-        return api(originalRequest);
       } catch (refreshError) {
-        processQueue(refreshError, null);
-
-        if (typeof window !== 'undefined') {
-          localStorage.removeItem('access_token');
-          localStorage.removeItem('refresh_token');
+        console.error('🔄 Refresh token failed:', refreshError);
+        localStorage.removeItem('access_token');
+        localStorage.removeItem('refresh_token');
+        if (typeof window !== 'undefined' && !window.location.pathname.includes('/login')) {
           window.location.href = '/login';
         }
-
-        toast.error('Session expired. Please login again.');
-        return Promise.reject(refreshError);
-      } finally {
-        isRefreshing = false;
       }
     }
-
-    // Standard toast notifications for non-401 errors
-    if (error.response?.status !== 401) {
-      const errorMessage =
-        error.response?.data?.message ||
-        error.response?.data?.error ||
-        'Something went wrong. Please try again.';
-      toast.error(errorMessage);
-    }
-
+    
+    // Log error for debugging
+    console.error('❌ API Error:', error.response?.status, error.response?.data || error.message);
+    
     return Promise.reject(error);
   }
 );
 
 // ============================================================
-// TYPES
+// AUTH API - Matches Flask routes: /api/auth/*
 // ============================================================
-
-export interface ApiResponse<T = any> {
-  success: boolean;
-  message?: string;
-  data: T;
-  error?: string;
-}
-
-export interface PaginatedResponse<T> {
-  items?: T[];
-  providers?: T[];
-  jobs?: T[];
-  violations?: T[];
-  notifications?: T[];
-  data?: T[];
-  pagination: {
-    page: number;
-    per_page: number;
-    total: number;
-    pages: number;
-  };
-}
-
-export interface User {
-  id: string;
-  email: string;
-  phone: string;
-  full_name: string;
-  role: 'customer' | 'provider' | 'admin' | 'support';
-  is_verified: boolean;
-  is_active: boolean;
-  profile_picture?: string;
-  address?: string;
-  city?: string;
-  state?: string;
-  created_at: string;
-}
-
-export interface Job {
-  id: string;
-  customer_id: string;
-  provider_id?: string;
-  category: string;
-  subcategory?: string;
-  title: string;
-  description: string;
-  address: string;
-  city?: string;
-  state?: string;
-  status: 'posted' | 'assigned' | 'in_progress' | 'completed' | 'cancelled' | 'disputed';
-  estimated_price?: number;
-  final_price?: number;
-  check_in_time?: string;
-  check_out_time?: string;
-  check_in_photo?: string;
-  check_out_photo?: string;
-  created_at: string;
-}
-
-export interface Provider {
-  id: string;
-  user_id: string;
-  business_name?: string;
-  bio?: string;
-  skills: string[];
-  hourly_rate?: number;
-  is_available: boolean;
-  rating: number;
-  total_reviews: number;
-  verification_status: 'unverified' | 'pending' | 'verified' | 'rejected';
-  user?: User;
-  created_at: string;
-}
-
-export interface Payment {
-  id: string;
-  job_id: string;
-  amount: number;
-  platform_fee: number;
-  provider_earnings: number;
-  provider: 'opay' | 'paystack' | 'flutterwave';
-  reference: string;
-  status: 'pending' | 'held' | 'released' | 'refunded' | 'failed' | 'disputed';
-  created_at: string;
-}
-
-export interface Violation {
-  id: string;
-  user_id: string;
-  job_id?: string;
-  type: string;
-  severity: 'minor' | 'major' | 'critical';
-  title: string;
-  description: string;
-  status: 'pending_review' | 'confirmed' | 'dismissed' | 'appealed' | 'resolved';
-  points_deducted: number;
-  created_at: string;
-}
-
-export interface Notification {
-  id: string;
-  title: string;
-  message: string;
-  type: 'job' | 'payment' | 'rating' | 'violation' | 'system' | 'user';
-  is_read: boolean;
-  created_at: string;
-}
-
-export interface Rating {
-  id: string;
-  job_id: string;
-  rater_id: string;
-  target_id: string;
-  rating: number;
-  comment?: string;
-  categories: Record<string, number>;
-  created_at: string;
-}
-
-// ============================================================
-// AUTH API
-// ============================================================
-
 export const authApi = {
-  register: (data: Record<string, any>) => api.post<ApiResponse<User>>('/auth/register', data),
-  login: (data: Record<string, any>) => api.post<ApiResponse<{ access_token: string; refresh_token: string; user: User }>>('/auth/login', data),
-  verify: (data: Record<string, any>) => api.post<ApiResponse<any>>('/auth/verify', data),
-  logout: () => api.post<ApiResponse<void>>('/auth/logout'),
-  refresh: (data: { refresh_token: string }) => api.post<ApiResponse<{ access_token: string }>>('/auth/refresh', data),
-  me: () => api.get<ApiResponse<User>>('/auth/me'),
-
-  resendVerification: (data: { email: string }) => api.post<ApiResponse<void>>('/auth/resend-verification', data),
-  forgotPassword: (data: { email: string }) => api.post<ApiResponse<void>>('/auth/forgot-password', data),
-  resetPassword: (data: { token: string; new_password: string }) => api.post<ApiResponse<void>>('/auth/reset-password', data),
-  changePassword: (data: { current_password: string; new_password: string }) => api.post<ApiResponse<void>>('/auth/change-password', data),
-
-  updateProfile: (data: Partial<User>) => api.put<ApiResponse<User>>('/auth/profile', data),
-  deleteAccount: () => api.delete<ApiResponse<void>>('/auth/me'),
+  login: (data: { email: string; password: string }) =>
+    api.post<ApiResponse<{ user: any; access_token: string; refresh_token?: string }>>('/auth/login', data),
+  
+  register: (data: { full_name: string; email: string; phone: string; password: string; role?: string }) =>
+    api.post<ApiResponse<{ user: any }>>('/auth/register', data),
+  
+  verify: (data: { email: string; code: string }) =>
+    api.post<ApiResponse>('/auth/verify', data),
+  
+  resendVerification: (data: { email: string }) =>
+    api.post<ApiResponse>('/auth/resend-verification', data),
+  
+  me: () =>
+    api.get<ApiResponse<{ user: any }>>('/auth/me'),
+  
+  logout: () =>
+    api.post<ApiResponse>('/auth/logout'),
+  
+  updateProfile: (data: any) =>
+    api.put<ApiResponse<{ user: any }>>('/auth/profile', data),
+  
+  changePassword: (data: { current_password: string; new_password: string }) =>
+    api.post<ApiResponse>('/auth/change-password', data),
+  
+  deleteAccount: () =>
+    api.delete<ApiResponse>('/auth/delete-account'),
+  
+  refresh: (data: { refresh_token: string }) =>
+    api.post<ApiResponse<{ access_token: string }>>('/auth/refresh', data),
 };
 
 // ============================================================
-// JOBS API
+// JOB API - Matches Flask routes: /api/jobs/*
 // ============================================================
-
 export const jobApi = {
-  create: (data: Record<string, any>) => api.post<ApiResponse<Job>>('/jobs', data),
-  list: (params?: Record<string, any>) => api.get<ApiResponse<PaginatedResponse<Job>>>('/jobs', { params }),
-  get: (id: string) => api.get<ApiResponse<Job>>(`/jobs/${id}`),
-  update: (id: string, data: Record<string, any>) => api.put<ApiResponse<Job>>(`/jobs/${id}`, data),
-  delete: (id: string) => api.delete<ApiResponse<void>>(`/jobs/${id}`),
-
-  my: (params?: Record<string, any>) => api.get<ApiResponse<PaginatedResponse<Job> | Job[]>>('/jobs/my', { params }),
-
-  apply: (id: string, data?: Record<string, any>) => api.post<ApiResponse<any>>(`/jobs/${id}/apply`, data),
-  assign: (id: string, data: { provider_id: string }) => api.post<ApiResponse<Job>>(`/jobs/${id}/assign`, data),
-
-  checkIn: (id: string, data: Record<string, any>) => api.post<ApiResponse<Job>>(`/jobs/${id}/check-in`, data),
-  checkOut: (id: string, data: Record<string, any>) => api.post<ApiResponse<Job>>(`/jobs/${id}/check-out`, data),
-
-  confirm: (id: string, data?: Record<string, any>) => api.post<ApiResponse<Job>>(`/jobs/${id}/confirm`, data),
-  cancel: (id: string, data?: Record<string, any>) => api.put<ApiResponse<Job>>(`/jobs/${id}/cancel`, data),
-
-  track: (id: string) => api.get<ApiResponse<any>>(`/jobs/${id}/track`),
-  estimate: (data: Record<string, any>) => api.post<ApiResponse<{ estimated_price: number }>>('/jobs/estimate', data),
+  list: (params?: any) =>
+    api.get<ApiResponse<{ jobs: any[] }>>('/jobs', { params }),
+  
+  get: (id: string) =>
+    api.get<ApiResponse<{ job: any }>>(`/jobs/${id}`),
+  
+  create: (data: any) =>
+    api.post<ApiResponse<{ job: any }>>('/jobs', data),
+  
+  update: (id: string, data: any) =>
+    api.put<ApiResponse<{ job: any }>>(`/jobs/${id}`, data),
+  
+  delete: (id: string) =>
+    api.delete<ApiResponse>(`/jobs/${id}`),
+  
+  getMyJobs: () =>
+    api.get<ApiResponse<{ jobs: any[] }>>('/jobs/my'),
+  
+  // Provider stats endpoints
+  getCustomerStats: () =>
+    api.get<ApiResponse<any>>('/jobs/stats/customer'),
+  
+  getRecentDeliveries: () =>
+    api.get<ApiResponse<any[]>>('/jobs/recent'),
+  
+  getWeeklySpending: () =>
+    api.get<ApiResponse<{ label: string; value: number }[]>>('/jobs/spending/weekly'),
+  
+  getProviderStats: () =>
+    api.get<ApiResponse<any>>('/jobs/stats/provider'),
+  
+  getAvailableJobs: () =>
+    api.get<ApiResponse<any[]>>('/jobs/available'),
+  
+  getDailyEarnings: () =>
+    api.get<ApiResponse<{ label: string; value: number }[]>>('/jobs/earnings/daily'),
 };
 
 // ============================================================
-// PROVIDERS API
+// PROVIDER API - Matches Flask routes: /api/providers/*
 // ============================================================
-
 export const providerApi = {
-  register: (data: Record<string, any>) => api.post<ApiResponse<Provider>>('/providers/register', data),
-  me: () => api.get<ApiResponse<Provider>>('/providers/me'),
-  update: (data: Record<string, any>) => api.put<ApiResponse<Provider>>('/providers/me', data),
-
-  verify: (data: Record<string, any>) => api.post<ApiResponse<any>>('/providers/verify', data),
-  getVerificationStatus: () => api.get<ApiResponse<any>>('/providers/verify/status'),
-
-  search: (params?: Record<string, any>) => api.get<ApiResponse<PaginatedResponse<Provider>>>('/providers/search', { params }),
-  get: (id: string) => api.get<ApiResponse<Provider>>(`/providers/${id}`),
-
-  stats: () => api.get<ApiResponse<Record<string, any>>>('/providers/me/stats'),
-  availability: (data: { is_available: boolean; schedule?: any }) => api.put<ApiResponse<any>>('/providers/me/availability', data),
-
-  addPortfolio: (data: Record<string, any>) => api.post<ApiResponse<any>>('/providers/portfolio', data),
-  removePortfolio: (id: string) => api.delete<ApiResponse<void>>(`/providers/portfolio/${id}`),
+  list: (params?: any) =>
+    api.get<ApiResponse<{ providers: any[] }>>('/providers', { params }),
+  
+  get: (id: string) =>
+    api.get<ApiResponse<{ provider: any }>>(`/providers/${id}`),
+  
+  getMe: () =>
+    api.get<ApiResponse<{ provider: any }>>('/providers/me'),
+  
+  register: (data: any) =>
+    api.post<ApiResponse<{ provider: any }>>('/providers/register', data),
+  
+  update: (data: any) =>
+    api.put<ApiResponse<{ provider: any }>>('/providers/me', data),
+  
+  verify: (data: any) =>
+    api.post<ApiResponse>('/providers/verify', data),
 };
 
 // ============================================================
-// PAYMENTS API
+// ADMIN API - Matches Flask routes: /api/admin/*
 // ============================================================
-
-export const paymentApi = {
-  initialize: (data: Record<string, any>) => api.post<ApiResponse<any>>('/payments/initialize', data),
-  verify: (data: { reference: string }) => api.post<ApiResponse<Payment>>('/payments/verify', data),
-
-  get: (id: string) => api.get<ApiResponse<Payment>>(`/payments/${id}`),
-  job: (jobId: string) => api.get<ApiResponse<Payment[] | { payments: Payment[] }>>(`/payments/job/${jobId}`),
-  me: () => api.get<ApiResponse<Payment[] | { payments: Payment[] }>>('/payments/me'),
-
-  webhook: (provider: string, data: Record<string, any>) => api.post<ApiResponse<void>>(`/payments/webhook/${provider}`, data),
-  getMethods: () => api.get<ApiResponse<any>>('/payments/methods'),
-};
-
-// ============================================================
-// VIOLATIONS API
-// ============================================================
-
-export const violationApi = {
-  report: (data: Record<string, any>) => api.post<ApiResponse<Violation>>('/violations', data),
-
-  list: (params?: Record<string, any>) => api.get<ApiResponse<PaginatedResponse<Violation>>>('/violations', { params }),
-  my: (params?: Record<string, any>) => api.get<ApiResponse<PaginatedResponse<Violation> | Violation[]>>('/violations/my', { params }),
-  get: (id: string) => api.get<ApiResponse<Violation>>(`/violations/${id}`),
-
-  appeal: (id: string, data: Record<string, any>) => api.post<ApiResponse<Violation>>(`/violations/${id}/appeal`, data),
-  stats: () => api.get<ApiResponse<Record<string, any>>>('/violations/stats'),
-};
-
-// ============================================================
-// RATINGS API
-// ============================================================
-
-export const ratingApi = {
-  create: (data: Record<string, any>) => api.post<ApiResponse<Rating>>('/ratings', data),
-
-  user: (userId: string) => api.get<ApiResponse<Rating[]>>(`/ratings/user/${userId}`),
-  me: () => api.get<ApiResponse<Rating[]>>('/ratings/me'),
-  job: (jobId: string) => api.get<ApiResponse<Rating[]>>(`/ratings/job/${jobId}`),
-
-  stats: (userId: string) => api.get<ApiResponse<Record<string, any>>>(`/ratings/stats/${userId}`),
-};
-
-// ============================================================
-// NOTIFICATIONS API
-// ============================================================
-
-export const notificationApi = {
-  list: (params?: Record<string, any>) => api.get<ApiResponse<PaginatedResponse<Notification>>>('/notifications', { params }),
-
-  markRead: (id: string) => api.put<ApiResponse<void>>(`/notifications/${id}/read`),
-  markAllRead: () => api.put<ApiResponse<void>>('/notifications/read-all'),
-
-  delete: (id: string) => api.delete<ApiResponse<void>>(`/notifications/${id}`),
-  deleteAll: () => api.delete<ApiResponse<void>>('/notifications'),
-
-  unreadCount: () => api.get<ApiResponse<{ count: number }>>('/notifications/unread-count'),
-};
-
-// ============================================================
-// ADMIN API
-// ============================================================
-
 export const adminApi = {
-  stats: () => api.get<ApiResponse<Record<string, any>>>('/admin/stats'),
+  getMetrics: () =>
+    api.get<ApiResponse<any>>('/admin/metrics'),
+  
+  getRegionStats: () =>
+    api.get<ApiResponse<{ label: string; value: number }[]>>('/admin/regions'),
+  
+  getSystemLogs: () =>
+    api.get<ApiResponse<any[]>>('/admin/logs'),
+  
+  getRevenueData: () =>
+    api.get<ApiResponse<{ label: string; value: number }[]>>('/admin/revenue'),
+};
 
-  users: (params?: Record<string, any>) => api.get<ApiResponse<PaginatedResponse<User>>>('/admin/users', { params }),
-  getUser: (id: string) => api.get<ApiResponse<User>>(`/admin/users/${id}`),
-  banUser: (id: string) => api.put<ApiResponse<User>>(`/admin/users/${id}/ban`),
-  unbanUser: (id: string) => api.put<ApiResponse<User>>(`/admin/users/${id}/unban`),
-  verifyProvider: (id: string) => api.put<ApiResponse<User>>(`/admin/users/${id}/verify-provider`),
+// ============================================================
+// USER API - Matches Flask routes: /api/users/*
+// ============================================================
+export const userApi = {
+  getProfileStats: () =>
+    api.get<ApiResponse<any>>('/users/stats'),
+  
+  updateProfile: (data: any) =>
+    api.put<ApiResponse<{ user: any }>>('/users/profile', data),
+  
+  getSecuritySettings: () =>
+    api.get<ApiResponse<any>>('/users/security'),
+  
+  updatePreferences: (data: any) =>
+    api.put<ApiResponse>('/users/preferences', data),
+  
+  changePassword: (data: { current_password: string; new_password: string }) =>
+    api.post<ApiResponse>('/users/change-password', data),
+};
 
-  jobs: (params?: Record<string, any>) => api.get<ApiResponse<PaginatedResponse<Job>>>('/admin/jobs', { params }),
-  getJob: (id: string) => api.get<ApiResponse<Job>>(`/admin/jobs/${id}`),
-  deleteJob: (id: string) => api.delete<ApiResponse<void>>(`/admin/jobs/${id}`),
+// ============================================================
+// PAYMENT API - Matches Flask routes: /api/payments/*
+// ============================================================
+export const paymentApi = {
+  list: (params?: any) =>
+    api.get<ApiResponse<{ payments: any[] }>>('/payments', { params }),
+  
+  get: (id: string) =>
+    api.get<ApiResponse<{ payment: any }>>(`/payments/${id}`),
+  
+  create: (data: any) =>
+    api.post<ApiResponse<{ payment: any }>>('/payments', data),
+  
+  verify: (data: { reference: string }) =>
+    api.post<ApiResponse>('/payments/verify', data),
+};
 
-  violations: (params?: Record<string, any>) => api.get<ApiResponse<PaginatedResponse<Violation>>>('/admin/violations', { params }),
-  reviewViolation: (id: string, data: Record<string, any>) => api.put<ApiResponse<Violation>>(`/admin/violations/${id}/review`, data),
+// ============================================================
+// RATINGS API - Matches Flask routes: /api/ratings/*
+// ============================================================
+export const ratingApi = {
+  create: (data: any) =>
+    api.post<ApiResponse<{ rating: any }>>('/ratings', data),
+  
+  getForTarget: (targetId: string) =>
+    api.get<ApiResponse<{ ratings: any[] }>>(`/ratings/target/${targetId}`),
+};
 
-  payments: (params?: Record<string, any>) => api.get<ApiResponse<PaginatedResponse<Payment>>>('/admin/payments', { params }),
-  refundPayment: (id: string) => api.post<ApiResponse<Payment>>(`/admin/payments/${id}/refund`),
+// ============================================================
+// NOTIFICATIONS API - Matches Flask routes: /api/notifications/*
+// ============================================================
+export const notificationApi = {
+  list: () =>
+    api.get<ApiResponse<{ notifications: any[] }>>('/notifications'),
+  
+  markAsRead: (id: string) =>
+    api.put<ApiResponse>(`/notifications/${id}/read`),
+  
+  markAllAsRead: () =>
+    api.put<ApiResponse>('/notifications/read-all'),
+};
+
+// ============================================================
+// VIOLATIONS API - Matches Flask routes: /api/violations/*
+// ============================================================
+export const violationApi = {
+  list: (params?: any) =>
+    api.get<ApiResponse<{ violations: any[] }>>('/violations', { params }),
+  
+  create: (data: any) =>
+    api.post<ApiResponse<{ violation: any }>>('/violations', data),
+  
+  get: (id: string) =>
+    api.get<ApiResponse<{ violation: any }>>(`/violations/${id}`),
+};
+
+// ============================================================
+// HELPER FUNCTIONS
+// ============================================================
+
+export const handleApiError = (error: any): string => {
+  if (error.isNetworkError) {
+    return 'Unable to connect to server. Please check your internet connection.';
+  }
+  
+  if (error.response?.data?.message) {
+    return error.response.data.message;
+  }
+  
+  if (error.response?.data?.error) {
+    return error.response.data.error;
+  }
+  
+  if (error.message) {
+    return error.message;
+  }
+  
+  return 'An unexpected error occurred. Please try again.';
 };
 
 export default api;
